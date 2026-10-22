@@ -58,7 +58,7 @@ CONFIGS = [
         "k": 5, "out": Decimal("48"), "alt_out": None,
         "derivation": "Anchor-token subtotal only: 9.6 × 5 = 48; source 360 may combine model outputs or use another denominator; split Oracle-billed and local-SLM output before costing",
         "status": "Anchor-output subtotal only, using 9.6 × 5", "api_complete": False,
-        "source_cost": Decimal("98.40"), "figure_reason": "Source output 360 is unexplained; the spend shown is not a complete cost unless no further Oracle output/input is billed",
+        "source_cost": Decimal("98.40"), "figure_reason": "Source output 360 may combine local-SLM and Oracle output; split model-specific outputs before costing. The spend shown is an Anchor-only subtotal.",
     },
     {
         "name": "Tier I + II (no entropy interrupt)", "in": 448, "source_out": 878,
