@@ -1,5 +1,13 @@
 # Symbolically-Compiled Reasoning Serving (SCRS)
 
+## Purpose: publication-quality, reproducible research
+
+The primary objective is to transform the existing SCRS manuscript into a scientifically defensible paper suitable for submission to a reputable peer-reviewed academic journal, while establishing a repeatable workflow for future revisions, experiments, tables, figures, and manuscript releases.
+
+This repository is a research-production workspace, not merely a collection of rewritten paragraphs. The work must preserve the source paper's actual claims and organization where supportable, distinguish source-derived facts from analysis and external literature, identify unsupported claims explicitly, and never promote simulated or inferred results as empirical measurements.
+
+The paper is not considered submission-ready until its claims, method, algorithm, experiments, statistics, figures, limitations, citations, and reproducibility materials have passed documented review.
+
 ## Working research repository
 
 **Manuscript status:** partial revision and analytical reconstruction in progress.  
@@ -7,6 +15,18 @@
 **Source status:** the supplied `SCRS_Manuscript.docx` was not modified. Its archive reported a CRC error in `word/media/image1.png`; therefore this repository must not be treated as a complete replacement manuscript.
 
 This repository separates revised passages, analytical assumptions, telemetry requirements, and synthetic scenario outputs. Results may be described as *measured* only when supported by trace/log provenance, collection method, sample size, and implementation version.
+
+## Research workflow
+
+Follow the staged workflow in [Research-to-publication workflow](docs/research-production-workflow.md). The governing stages are:
+
+1. **Source recovery and inventory** — establish a readable, hashed canonical manuscript and inventory every claim, equation, table, figure, citation, and referenced artifact.
+2. **Scientific audit** — assess novelty, related work, definitions, assumptions, proofs/derivations, algorithm correctness, evaluation design, statistical validity, and limitations before rewriting.
+3. **Claim-to-evidence mapping** — label each substantive statement as source-derived, analytically derived, externally supported, experimentally measured, simulated, or unresolved.
+4. **Section-by-section rewrite** — preserve the meaning where valid; correct inconsistencies transparently; do not invent experiments, citations, or results.
+5. **Reproducible evaluation** — version code, data provenance, environment, seeds, configurations, and scripts that generate tables/figures.
+6. **Independent validation** — regenerate artifacts from a clean environment and compare them with the manuscript.
+7. **Journal readiness review** — align scope and format to a selected journal only after the scientific core and evidence are stable.
 
 ## Contents
 
