@@ -1,0 +1,21 @@
+{
+  "description": "One row per request. For true per-call analysis, store a separate event-level table with one row per API attempt.",
+  "request_level_fields": [
+    "request_id_hash", "config_version", "deployment_version", "timestamp_utc", "regime",
+    "request_start_monotonic_ms", "request_end_monotonic_ms", "queue_wait_ms", "oracle_ttft_ms",
+    "oracle_tpot_ms_per_token", "oracle_input_tokens", "oracle_output_tokens", "oracle_call_count",
+    "anchor_logical_event_count", "anchor_api_attempt_count", "anchor_retry_count",
+    "anchor_batched_call_count", "anchor_total_input_tokens", "anchor_total_output_tokens",
+    "slm_generation_start_ms", "slm_generation_end_ms", "slm_generated_tokens",
+    "slm_render_start_ms", "slm_render_end_ms", "halt_decision_ms", "partial_local_tokens_at_halt",
+    "fallback_start_ms", "fallback_end_ms", "bailout_incremental_overhead_ms", "provider_model",
+    "price_tier", "cached_input_tokens", "terminal_status", "notes_redacted"
+  ],
+  "required_event_level_fields": [
+    "request_id_hash", "event_id", "parent_event_id", "event_type", "provider_request_id_redacted",
+    "attempt_number", "batch_id", "start_monotonic_ms", "end_monotonic_ms", "queue_wait_ms",
+    "ttft_ms", "tpot_ms_per_token", "input_tokens", "output_tokens", "status", "retry_reason",
+    "model", "region", "price_tier"
+  ],
+  "privacy": "Do not record API keys, raw prompts, full responses, or unredacted user identifiers."
+}
