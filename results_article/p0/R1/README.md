@@ -20,6 +20,7 @@
 - [`table2_recalculation.csv`](table2_recalculation.csv) — all eight configurations, original and recalculated output values, API-only spend scenarios, and unresolved statuses.
 - [`figure3_cost_data.csv`](figure3_cost_data.csv) — cost-panel reconstruction data with publication-readiness flags.
 - [`recalculate_costs.py`](recalculate_costs.py) — standard-library-only script that regenerates both CSV files and asserts key R1 arithmetic.
+- [`validation_report.md`](validation_report.md) — scope, arithmetic checks, artifact QA, unresolved inputs, and R1 disposition.
 
 ## Reproducing the audit CSVs
 
