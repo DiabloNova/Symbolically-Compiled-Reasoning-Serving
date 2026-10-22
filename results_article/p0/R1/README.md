@@ -19,16 +19,17 @@
 - [`rewritten_sections.md`](rewritten_sections.md) — proposed replacement text for the cost-related parts of §7.3, §§9.1–9.4, Table 2 interpretation, and Appendix A.3.
 - [`table2_recalculation.csv`](table2_recalculation.csv) — all eight configurations, original and recalculated output values, API-only spend scenarios, and unresolved statuses.
 - [`figure3_cost_data.csv`](figure3_cost_data.csv) — cost-panel reconstruction data with publication-readiness flags.
+- [`recalculate_costs.py`](recalculate_costs.py) — standard-library-only script that regenerates both CSV files and asserts key R1 arithmetic.
 
 ## Reproducing the audit CSVs
 
 From this directory in a clean checkout, run:
 
-\`\`\`sh
+```sh
 python3 recalculate_costs.py
-\`\`\`
+```
 
-The script regenerates \`table2_recalculation.csv\` and \`figure3_cost_data.csv\`. It keeps unsupported output totals blank and labels component-only values rather than silently promoting them to full totals.
+The script regenerates `table2_recalculation.csv` and `figure3_cost_data.csv`. It keeps unsupported output totals blank and labels component-only values rather than silently promoting them to full totals.
 
 ## API-only price scenario
 
