@@ -1,0 +1,9 @@
+Configuration,Requests simulated,R1 share,R2 bailout share,R3/direct share,Mean API calls/request,Mean anchor calls/request,P95 anchor calls/answer,Mean queue time/request (s),Median queue time/request (s),Mean E2E (s),P50 E2E (s),P95 E2E (s),P50 TTFT (ms),P95 TTFT (ms),Evidence status
+Baseline,100000,0,0,1,1,0,0,0.1292,0.0799,44.7079,43.7989,60.8393,1437.9,2168.0,synthetic
+Tier I only,100000,0,0,1,1,0,0,0.1300,0.0808,43.5155,42.6431,59.3432,1440.6,2175.1,synthetic
+Tier II only,100000,0.62094,0.10027,0.27879,0.37906,0,0,0.0492,0,20.0779,5.8295,55.2124,60.2,1801.4,synthetic
+Tier III only,100000,0,0,1,9.59778,9.59778,15,1.2343,0.9011,19.7397,19.0570,30.4487,42.9,72.6,synthetic
+Tier I + III,100000,0,0,1,9.59542,9.59542,15,1.2362,0.9023,19.7431,19.0684,30.4745,43.0,72.7,synthetic
+Tier I + II,100000,0.61941,0.10071,0.27988,0.38059,0,0,0.0488,0,19.6587,5.8170,53.8300,60.3,1801.9,synthetic
+Naive unhardened JIT,100000,0.78036,0,0.21964,0.21964,0,0,0.0289,0,13.5265,5.0358,50.9405,48.2,1716.1,synthetic
+Unified SCRS,100000,0.62127,0.10035,0.27838,1.249,0.87027,3,0.1611,0.0850,20.9238,8.8428,53.6472,60.2,1796.0,synthetic
