@@ -20,6 +20,16 @@
 - [`table2_recalculation.csv`](table2_recalculation.csv) — all eight configurations, original and recalculated output values, API-only spend scenarios, and unresolved statuses.
 - [`figure3_cost_data.csv`](figure3_cost_data.csv) — cost-panel reconstruction data with publication-readiness flags.
 
+## Reproducing the audit CSVs
+
+From this directory in a clean checkout, run:
+
+\`\`\`sh
+python3 recalculate_costs.py
+\`\`\`
+
+The script regenerates \`table2_recalculation.csv\` and \`figure3_cost_data.csv\`. It keeps unsupported output totals blank and labels component-only values rather than silently promoting them to full totals.
+
 ## API-only price scenario
 
 The reconstruction workbook's standard gpt-6.1-sol scenario uses USD 2 per million input tokens and USD 10 per million output tokens, with no cached-input discount. Those rates are listed on the [official pricing page](https://developers.openai.com/api/docs/pricing) checked on 2026-10-22. The source manuscript itself is provider-agnostic. The scenario totals assume Table 2 input-token counts include every billed Oracle prompt, including Anchor prompts; that assumption still needs confirmation.
