@@ -56,7 +56,7 @@ CONFIGS = [
         "name": "Tier I + III (no JIT)", "in": 1180, "source_out": 360,
         "alpha": Decimal("0"), "full_mean": 2310, "interrupts": Decimal("9.6"),
         "k": 5, "out": Decimal("48"), "alt_out": None,
-        "derivation": "Anchor-token subtotal only: 9.6 × 5 = 48; source 360 requires an unstated additional output term or different denominator",
+        "derivation": "Anchor-token subtotal only: 9.6 × 5 = 48; source 360 may combine model outputs or use another denominator; split Oracle-billed and local-SLM output before costing",
         "status": "Anchor-output subtotal only, using 9.6 × 5", "api_complete": False,
         "source_cost": Decimal("98.40"), "figure_reason": "Source output 360 is unexplained; the spend shown is not a complete cost unless no further Oracle output/input is billed",
     },
