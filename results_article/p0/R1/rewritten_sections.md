@@ -47,7 +47,7 @@ The non-cost columns of the original Table 2 are deliberately not recalculated i
 | Tier I only (capsules) | 2,310 | 2,310 (carried-forward reference) | 254.60 | Source output mean is not derived independently |
 | Tier II only (hardened JIT) | 905 | 904.4 fallback-only component | 139.24 | \((1-0.62)\times2,380=904.4\); does not exactly reproduce 905 |
 | Tier III only (entropy interrupt) | 480 | Not reproducible | Not reproducible | Conditional Anchor/output distribution is missing |
-| Tier I + III (no JIT) | 360 | 48 Anchor-token subtotal | 28.40 subtotal only | \(9.6\times5=48\); source 360 needs an additional stated term or different denominator |
+| Tier I + III (no JIT) | 360 | 48 Anchor-token subtotal | 28.40 subtotal only | \(9.6\times5=48\) is the billable Anchor-output subtotal; the source's 360 may mix Oracle and local-SLM tokens, so outputs must be split by model before costing |
 | Tier I + II (no entropy interrupt) | 878 | 877.8 fallback-only component | 96.74 | \((1-0.62)\times2,310=877.8\), which rounds to 878 |
 | Naive unhardened JIT (no gate) | 690 | 523.6 fallback-only component | 59.96 subtotal only | \((1-0.78)\times2,380=523.6\); total requires any additional billed Oracle outputs |
 | Unified SCRS (I + II + III) | 894 | 884.8 under primary interpretation; 882.14 if 1.4 is conditional on fast-path completion | 98.72 under primary interpretation; 98.454 under alternate | Neither token estimate reproduces 894; interpretation of the 1.4-anchor mean must be fixed |
