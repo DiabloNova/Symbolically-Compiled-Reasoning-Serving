@@ -123,7 +123,7 @@ Section 9.3 reports 9.6 interrupts per answer and Section 6.2 gives \(k=5\) Anch
 9.6\times5=48\text{ tokens/request}.
 \]
 
-This does not reproduce the Table 2 value of 360. If 360 includes other Oracle output or a different interrupt denominator, the source must state those terms. The 48-token value is an Anchor subtotal under the stated assumption, not proof that all other Oracle output is zero.
+This does not reproduce the Table 2 value of 360 as Oracle-billed output. The original Out-tok column does not say whether 360 includes local-SLM output; if it does, that metric must be split by model before costing. If other Oracle output is included, the source must state those terms. The 48-token value is an Anchor subtotal under the stated assumption, not proof that all other Oracle output is zero.
 
 ### Naive JIT
 
