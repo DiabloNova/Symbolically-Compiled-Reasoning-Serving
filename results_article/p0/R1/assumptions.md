@@ -21,7 +21,7 @@
 | Mean anchor interrupts, Unified SCRS | 1.4/request | §9.3 | Ambiguous: unconditional per request or conditional on a successful fast path |
 | Anchor maximum length | \(k=5\) tokens | §6.2 and Table 1 | Source configuration; exact billable output per call is not stated as a measured mean |
 | Unified SCRS Oracle output | 894 tokens/request | Table 2, row 8 | Not reproducible from the stated inputs |
-| Tier I + III Oracle output | 360 tokens/request | Table 2, row 5 | Not reproduced by 9.6 × 5 = 48 Anchor tokens/request |
+| Tier I + III Oracle output | 360 tokens/request | Table 2, row 5 | Not reproduced as Oracle-billed output by 9.6 × 5 = 48 Anchor tokens/request; the source column does not clarify whether 360 includes local-SLM output |
 | Naive JIT Oracle output | 690 tokens/request | Table 2, row 7 | Not reproduced by the fallback-only calculation 0.22 × 2,380 = 523.6 |
 
 ## Explicit API pricing scenario
