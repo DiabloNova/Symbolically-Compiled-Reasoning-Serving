@@ -1,0 +1,9 @@
+{
+  "scenario": "SCRS latency scenario v2",
+  "requests_per_configuration": 100000,
+  "seed": 20261022,
+  "status": "synthetic scenario; not production telemetry",
+  "outputs_uploaded": ["results.csv", "README.md"],
+  "outputs_not_yet_uploaded": ["SCRS_latency_scenario_v2.py", "snapshot.json", "snapshot.xlsx", "P50-P95.png"],
+  "critical_assumption": "Anchor events are modelled as serial Oracle API round trips; actual transport behavior has not been verified from implementation traces."
+}
