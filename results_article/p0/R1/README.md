@@ -8,7 +8,7 @@
 
 - Tier II only: `(1 - 0.62) × 2,380 = 904.4` fallback-output tokens/request, not exactly the reported 905.
 - Tier I + II: `(1 - 0.62) × 2,310 = 877.8`, consistent with 878 after rounding.
-- Tier I + III: `9.6 interrupts/request × 5 tokens/interrupt = 48` Anchor output tokens/request, not the reported 360; the source does not provide an additional output term to explain the difference.
+- Tier I + III: `9.6 interrupts/request × 5 tokens/interrupt = 48` billable Anchor output tokens/request. It does not explain the source's 360 as Oracle output; the source column may mix Oracle and local-SLM tokens and must be split by model before costing.
 - Naive JIT: `(1 - 0.78) × 2,380 = 523.6` is only a fallback-output component; the reported 690 is unreproduced unless other Oracle outputs are specified.
 - Unified SCRS: `(1 - 0.62) × 2,310 + 1.4 × 5 = 884.8` if 1.4 is an unconditional request-level mean. If 1.4 is conditional on the completed fast path, the result is `877.8 + 0.62 × 1.4 × 5 = 882.14`. Neither gives the reported 894.
 
