@@ -189,7 +189,7 @@ configs=[
 ]
 results=[sim_config(*c) for c in configs]
 summary=pd.DataFrame([{k:v for k,v in r.items() if not k.startswith('_')} for r in results])
-summary.to_csv(OUT/'SCRS_latency_scenario_v2_results.csv',index=False)
+summary.to_csv(OUT/'results.csv',index=False)
 
 # Synthetic telemetry contract/example, explicitly marked synthetic. One row per config is aggregate, not request-level real logs.
 telemetry_fields=[
@@ -264,7 +264,7 @@ plt.legend(); plt.tight_layout()
 plt.savefig(OUT/'SCRS_Latency_Scenario_v2_P50_P95.png',dpi=160); plt.close()
 
 # Machine-readable model provenance and results snapshot
-with (OUT/'SCRS_Latency_Scenario_v2_snapshot.json').open('w',encoding='utf-8') as f:
+with (OUT/'snapshot.json').open('w',encoding='utf-8') as f:
  import json
  json.dump({'status':'synthetic_monte_carlo_not_production_telemetry','seed':SEED,'n':N,'parameters':PARAMS,'alpha_eff':ALPHA,'p_hit_assumption':P_HIT,'p_bail':P_BAIL,'p_miss':P_MISS,'anchor_calls_per_interrupt':'one generateAnchors invocation per interrupt; separate HTTP round-trip inferred but unverified','results':summary.to_dict(orient='records')},f,ensure_ascii=False,indent=2)
 
@@ -272,6 +272,6 @@ print('Status: synthetic scenario only; no implementation telemetry was availabl
 print(f'R1={ALPHA:.3f}, R2={P_BAIL:.3f}, R3={P_MISS:.3f}; N={N}, seed={SEED}')
 print(summary[['Configuration','Mean API calls/request','Mean anchor calls/request','P50 E2E (s)','P95 E2E (s)','P50 TTFT (ms)']].to_string(index=False))
 print('Wrote:',xlsx)
-print('Wrote:',OUT/'SCRS_latency_scenario_v2_results.csv')
+print('Wrote:',OUT/'results.csv')
 print('Wrote:',OUT/'SCRS_Latency_Scenario_v2_P50_P95.png')
-print('Wrote:',OUT/'SCRS_Latency_Scenario_v2_snapshot.json')
+print('Wrote:',OUT/'snapshot.json')
