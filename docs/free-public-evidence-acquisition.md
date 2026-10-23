@@ -56,6 +56,8 @@ The downloader should also be tested without a network connection for parsing, t
 
 For each selected task separately, compare at least: (1) original-context baseline, (2) capsule-only condition, and (3) capsule plus compiled graph and compatibility gates. Where the goal is to isolate the representation change, hold the model/version, input examples, decoding settings, and scoring rules constant. Add predeclared ablations for individual decision-relevant fields and compatibility gates. Keep all model tuning on a development split, not test. Preserve source gold labels, and document any human grading.
 
+`scripts/data/verify_public_evidence_snapshot.py` checks the committed archive SHA-256, task-level licence metadata, source revision, raw and normalized hashes, TSV-to-JSONL agreement, row counts, and allowed labels.
+
 `scripts/evaluation/score_legalbench.py` scores **supplied prediction files only**; it does not invoke a model. One prediction per test index is required, with the shape `{"index": 0, "prediction": "generic"}`. It rejects missing/duplicate/extra indices and labels outside the task inventory, normalizes labels only by whitespace trimming and case-folding, and reports accuracy with Wilson 95% interval, macro precision/recall/F1, per-class metrics, and a confusion matrix. Example:
 
 ```bash
@@ -77,6 +79,7 @@ Do not label expectations from equations or Monte Carlo projections as measured 
 
 - Acquisition tests: 9 passed.
 - Scorer tests: 7 passed.
+- Snapshot verifier tests: 6 passed; full pinned archive verification passed.
 - Python compile check: `python3 -m compileall -q scripts tests` passed.
 - Local data validation: all 12 train/test split triples (TSV, JSONL, manifest) matched their recorded row counts and both SHA-256 hashes.
 - These checks validate tooling and data integrity only; they do not score a model. Existing latency/cost scenarios remain synthetic until actual implementation traces are captured.
