@@ -1,0 +1,50 @@
+"""Executable reference model for the SCRS cross-domain acceptance contract.
+
+This is a specification oracle for conformance tests, not production SCRS code.
+The caller must supply already-authenticated validation results; this module
+cannot establish that upstream domain extraction or provenance verification is correct.
+"""
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class Candidate:
+    request_domain: Optional[str]
+    capsule_domain: Optional[str]
+    request_contract_version: Optional[str]
+    capsule_contract_version: Optional[str]
+    preconditions_compatible: Optional[bool]
+    exceptions_compatible: Optional[bool]
+    request_validated: bool
+    capsule_validated: bool
+    provenance_valid: bool
+
+
+@dataclass(frozen=True)
+class Decision:
+    accepted: bool
+    reason: str
+
+
+def decide(candidate: Candidate) -> Decision:
+    """Fail closed for missing, unknown, invalid, or incompatible inputs."""
+    if not candidate.request_validated:
+        return Decision(False, "REQUEST_NOT_VALIDATED")
+    if not candidate.capsule_validated:
+        return Decision(False, "CAPSULE_NOT_VALIDATED")
+    if not candidate.provenance_valid:
+        return Decision(False, "PROVENANCE_INVALID")
+    if not candidate.request_domain or not candidate.capsule_domain:
+        return Decision(False, "DOMAIN_MISSING")
+    if candidate.request_domain != candidate.capsule_domain:
+        return Decision(False, "DOMAIN_MISMATCH")
+    if not candidate.request_contract_version or not candidate.capsule_contract_version:
+        return Decision(False, "CONTRACT_VERSION_MISSING")
+    if candidate.request_contract_version != candidate.capsule_contract_version:
+        return Decision(False, "CONTRACT_VERSION_MISMATCH")
+    if candidate.preconditions_compatible is not True:
+        return Decision(False, "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
+    if candidate.exceptions_compatible is not True:
+        return Decision(False, "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
+    return Decision(True, "ACCEPTED")
