@@ -1,0 +1,95 @@
+{"fields":{"answer":"generic","index":0,"text":"The mark “Salt” for packages of sodium chloride."},"index":0,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":1,"text":"The mark \"Aspirin\" for inflammation medicine."},"index":1,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":2,"text":"The mark \"Telephone\" for a portable device you can use to call people."},"index":2,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":3,"text":"The mark \"Food\" for a restaurant."},"index":3,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":4,"text":"The mark \"Kerosene\" for packages of flammable liquids used to start fires."},"index":4,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":5,"text":"The mark \"Mask\" for cloth that you wear on your face to filter air."},"index":5,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":6,"text":"The mark \"Gun\" for a firearm."},"index":6,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":7,"text":"The mark \"H2O\" for bottled water."},"index":7,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":8,"text":"The mark \"Watch\" for an Apple smartwatch."},"index":8,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":9,"text":"The mark \"Monitor\" for a digital display."},"index":9,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":10,"text":"The mark \"Car\" for a line of automobiles."},"index":10,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":11,"text":"The mark \"Popcorn\" for microwavable snacks."},"index":11,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":12,"text":"The mark \"Pen\" for writing implements which use ink."},"index":12,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":13,"text":"The mark \"Diamond\" for precious stones."},"index":13,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":14,"text":"The mark \"Cutlery\" for eating utencils."},"index":14,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":15,"text":"The mark \"Fruit\" for apples."},"index":15,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":16,"text":"The mark \"Pictures\" for a photography service."},"index":16,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":17,"text":"The mark \"Cables\" for electronic wires."},"index":17,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"generic","index":18,"text":"The mark \"Tape\" for adhesive materials."},"index":18,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":19,"text":"The mark “Sharp” for a television."},"index":19,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":20,"text":"The mark \"Trim\" for nail clippers."},"index":20,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":21,"text":"The mark \"Fresh\" for car deodorizer."},"index":21,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":22,"text":"The mark \"Cold and Creamy\" for ice cream desserts."},"index":22,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":23,"text":"The mark \"International Business Machines\" for a computer manufacturer."},"index":23,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":24,"text":"The mark \"Sharp\" for televisions."},"index":24,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":25,"text":"The mark \"Holiday Inn\" for hotel services."},"index":25,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":26,"text":"The mark \"Soft\" for pillows."},"index":26,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":27,"text":"The mark \"Smooth\" for keyboards."},"index":27,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":28,"text":"The mark \"Bright\" for desk lamps."},"index":28,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":29,"text":"The mark \"Compact\" for wallets."},"index":29,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":30,"text":"The mark \"Speedy\" for a bus service."},"index":30,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":31,"text":"The mark \"Best Washing\" for a laundromat."},"index":31,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":32,"text":"The mark \"Kold and Kreamy\" for milkshakes."},"index":32,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":33,"text":"The mark \"American Airlines\" for an air based transporation service."},"index":33,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":34,"text":"The mark \"QuickClean\" for towels."},"index":34,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":35,"text":"The mark \"Party Time!\" for an event planning service."},"index":35,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":36,"text":"The mark \"Unique Haircuts\" for a hair salon."},"index":36,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"descriptive","index":37,"text":"The mark \"Coastal Winery\" for varietal wines."},"index":37,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":38,"text":"The mark \"Chicken of the Sea\" for canned fish."},"index":38,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":39,"text":"The mark \"Coppertone\" for suntan oil."},"index":39,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":40,"text":"The mark \"Jaguar\" for cars."},"index":40,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":41,"text":"The mark \"Airbus\" for an airplane manufacturer."},"index":41,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":42,"text":"The mark \"Old Crow\" for whiskey."},"index":42,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":43,"text":"The mark \"Microsoft\" for small computers."},"index":43,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":44,"text":"The mark \"Netflix\" for an online streaming service."},"index":44,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":45,"text":"The mark \"Greyhound\" for a high speed bus service."},"index":45,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":46,"text":"The mark \"Citibank\" for urban financial services."},"index":46,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":47,"text":"The mark \"KitchenAid\" for baking appliances."},"index":47,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":48,"text":"The mark \"Quick Green\" for grass seed."},"index":48,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":49,"text":"The mark \"Public Eye\" for a weekly tabloid publication."},"index":49,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":50,"text":"The mark \"CarMax\" for a used car dealership."},"index":50,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":51,"text":"The mark \"Equine Technologies\" for horse hoof pads."},"index":51,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":52,"text":"The mark \"Penguin Appliances\" for air conditioning manufacturer."},"index":52,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":53,"text":"The mark \"7-Eleven\" for a convenience store that opens at 7am and closes at 11pm."},"index":53,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":54,"text":"The mark \"Seventeen\" for magazines targeted at teenagers."},"index":54,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":55,"text":"The mark \"Roach Motel\" for insect traps."},"index":55,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":56,"text":"The mark \"Orange Crush\" for fruit flavored soda."},"index":56,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":57,"text":"The mark \"Apple\" for a computer manufacturer."},"index":57,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":58,"text":"The mark \"Dove\" for chocolate."},"index":58,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":59,"text":"The mark \"Lotus\" for software."},"index":59,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":60,"text":"The mark \"Sun\" for computers."},"index":60,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":61,"text":"The mark \"Camel\" for cigarettes."},"index":61,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":62,"text":"The mark \"Coach\" for luxury accessories."},"index":62,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":63,"text":"The mark \"Shell\" for gas stations."},"index":63,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"suggestive","index":64,"text":"The mark \"Cheetah\" for a web browser."},"index":64,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":65,"text":"The mark \"Oxygen\" for a line of pillows."},"index":65,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":66,"text":"The mark \"Daisy\" for a sports car."},"index":66,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":67,"text":"The mark \"Whirlpool\" for an oven."},"index":67,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":68,"text":"The mark \"Penguin\" for a bus service."},"index":68,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":69,"text":"The mark \"Amazon\" for an online shopping service."},"index":69,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":70,"text":"The mark \"Sahara\" for an ice cream seller."},"index":70,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":71,"text":"The mark \"Shark\" for a custom t-shirt maker."},"index":71,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":72,"text":"The mark \"GreenBull\" for formal wear."},"index":72,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":73,"text":"The mark \"Cheetah\" for a brand of wallets."},"index":73,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":74,"text":"The mark \"TidePool\" for treehouse manufacturing company."},"index":74,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"arbitrary","index":75,"text":"The mark \"Fever\" for washing detergent."},"index":75,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":76,"text":"The mark \"Madak\" for a printing company."},"index":76,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":77,"text":"The mark \"Yuteal\" for cleaning wipes."},"index":77,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":78,"text":"The mark \"Reloto\" for soda."},"index":78,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":79,"text":"The mark \"Wohold\" for gasoline."},"index":79,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":80,"text":"The mark “Balto” for a television streaming service."},"index":80,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":81,"text":"The mark \"Whatpor\" for an online shopping service."},"index":81,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":82,"text":"The mark \"Moodle\" for an internet search engine."},"index":82,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":83,"text":"The mark \"Yoddles\" for a chocolate candy."},"index":83,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":84,"text":"The mark \"Heullga\" for a line of waterbottles."},"index":84,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":85,"text":"The mark \"Kalp\" for a consulting services company."},"index":85,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":86,"text":"The mark \"Imprion\" for a line of sports drinks."},"index":86,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":87,"text":"The mark \"Oamp\" for baseball bats."},"index":87,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":88,"text":"The mark \"Nekmit\" for a line of wedding rings."},"index":88,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":89,"text":"The mark \"Membles\" for a literature oriented magazine."},"index":89,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":90,"text":"The mark \"Sast\" for salad dressing."},"index":90,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":91,"text":"The mark \"Antilds\" for plant seeds."},"index":91,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":92,"text":"The mark \"Lanbe\" for custom wallets."},"index":92,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":93,"text":"The mark \"Vit\" for a video conferencing service."},"index":93,"split":"test","task":"abercrombie"}
+{"fields":{"answer":"fanciful","index":94,"text":"The mark \"Ceath\" for waterguns."},"index":94,"split":"test","task":"abercrombie"}

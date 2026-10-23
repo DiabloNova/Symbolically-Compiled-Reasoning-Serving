@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "plan_id": "scrs-legalbench-six-task-v1",
+  "status": "preregistered_data_ready_model_runs_not_yet_executed",
+  "created_at": "2026-10-23",
+  "purpose": "Define reproducible, task-specific comparison conditions without inventing predictions or mixing empirical measurements with simulation.",
+  "source": {
+    "dataset_id": "nguha/legalbench",
+    "homepage": "https://huggingface.co/datasets/nguha/legalbench",
+    "paper": "https://arxiv.org/abs/2308.11462",
+    "revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+    "archive_path": "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz",
+    "archive_sha256": "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a",
+    "archive_bytes": 235454,
+    "included_tasks": 6,
+    "split_count": 12,
+    "training_examples": 32,
+    "test_examples": 799,
+    "total_examples": 831,
+    "license_policy": "Allow only the six specific task pages that state CC BY 4.0. Do not infer permission for other LegalBench tasks."
+  },
+  "preregistered_protocol": {
+    "compare_conditions": [
+      "original_context",
+      "capsule_only",
+      "capsule_compiled_graph_gates"
+    ],
+    "hold_constant": [
+      "same test rows",
+      "same baseline model and exact model revision where conditions permit",
+      "same task prompt/scoring rules",
+      "same decoding parameters and stop rules where applicable"
+    ],
+    "tuning_policy": "Tune prompts and thresholds only on a declared development set; do not tune on the final test split.",
+    "reporting_policy": "Publish each task's metrics independently. Do not pool unrelated task accuracies into an unqualified overall score.",
+    "traceability": "Record model ID/revision, inference runtime, prompt/version hashes, SCRS extractor/compiler/adapter commits, temperature/top_p/max_tokens, seed, errors/timeouts, per-stage timing, fallback, token counts, cost source/date, and prediction-file SHA-256.",
+    "evidence_boundary": "Public benchmark scores cannot establish provider-billed cost or production latency. Keep simulation and deployment measurements separate."
+  },
+  "execution_status": {
+    "data_acquisition": "completed",
+    "archive_verification": "passed",
+    "acquisition_tests": "9_passed",
+    "scorer_tests": "7_passed",
+    "snapshot_verifier_tests": "6_passed",
+    "python_compile_check": "passed",
+    "baseline_predictions": "not_generated",
+    "capsule_only_predictions": "not_generated",
+    "compiled_graph_predictions": "not_generated",
+    "scored_reports": "none",
+    "blocker": "No end-to-end runnable and verified set of original-context, capsule-only, and compiled-graph/gates prediction adapters plus execution traces has been produced in this stage. Do not synthesize placeholder predictions."
+  },
+  "tasks": [
+    {
+      "id": "abercrombie",
+      "train_rows": 5,
+      "test_rows": 95,
+      "labels": [
+        "generic",
+        "descriptive",
+        "suggestive",
+        "arbitrary",
+        "fanciful"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/abercrombie/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    },
+    {
+      "id": "contract_qa",
+      "train_rows": 8,
+      "test_rows": 80,
+      "labels": [
+        "Yes",
+        "No"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/contract_qa.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/contract_qa/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    },
+    {
+      "id": "ucc_v_common_law",
+      "train_rows": 6,
+      "test_rows": 94,
+      "labels": [
+        "UCC",
+        "Common Law"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/ucc_v_common_law.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/ucc_v_common_law/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    },
+    {
+      "id": "function_of_decision_section",
+      "train_rows": 7,
+      "test_rows": 367,
+      "labels": [
+        "Facts",
+        "Procedural History",
+        "Issue",
+        "Rule",
+        "Analysis",
+        "Conclusion",
+        "Decree"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/function_of_decision_section.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/function_of_decision_section/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    },
+    {
+      "id": "legal_reasoning_causality",
+      "train_rows": 4,
+      "test_rows": 55,
+      "labels": [
+        "Yes",
+        "No"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/legal_reasoning_causality.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/legal_reasoning_causality/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    },
+    {
+      "id": "citation_prediction_classification",
+      "train_rows": 2,
+      "test_rows": 108,
+      "labels": [
+        "Yes",
+        "No"
+      ],
+      "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/citation_prediction_classification.html",
+      "licence": "CC BY 4.0",
+      "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+      "evaluation_split": "test",
+      "status": "data_ready_predictions_not_generated",
+      "conditions": [
+        {
+          "id": "original_context",
+          "required_input": "Original upstream context and question",
+          "status": "blocked_until_model_runner_is_available"
+        },
+        {
+          "id": "capsule_only",
+          "required_input": "Capsule from a pinned, runnable SCRS extractor",
+          "status": "blocked_until_verified_extractor_is_available"
+        },
+        {
+          "id": "capsule_compiled_graph_gates",
+          "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
+          "status": "blocked_until_verified_scrs_execution_path_is_available"
+        }
+      ],
+      "prediction_file_schema": {
+        "index": "integer matching the source test row index",
+        "prediction": "one exact label from the task's allowlisted labels"
+      },
+      "proposed_output_directory": "results/public-benchmarks/citation_prediction_classification/",
+      "primary_metric": "accuracy",
+      "secondary_metrics": [
+        "macro_precision",
+        "macro_recall",
+        "macro_f1",
+        "per_class_precision_recall_f1",
+        "confusion_matrix",
+        "wilson_95_percent_interval_for_accuracy"
+      ]
+    }
+  ]
+}
