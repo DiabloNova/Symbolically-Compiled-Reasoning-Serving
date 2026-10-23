@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "script_version": "1.1.0",
+  "dataset_id": "nguha/legalbench",
+  "dataset_homepage": "https://huggingface.co/datasets/nguha/legalbench",
+  "task": "abercrombie",
+  "split": "test",
+  "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+  "upstream_source_path": "data/abercrombie/test.tsv",
+  "upstream_source_url": "https://huggingface.co/datasets/nguha/legalbench/resolve/daec8237410aa23e3faf4bc41ad8b3a7e1696826/data/abercrombie/test.tsv",
+  "rows_written": 95,
+  "columns": [
+    "index",
+    "answer",
+    "text"
+  ],
+  "task_license": "CC BY 4.0",
+  "task_license_spdx": "CC-BY-4.0",
+  "task_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "official_task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html",
+  "attribution": "LegalBench (task: abercrombie), source: Neel Guha; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+  "retrieved_at_utc": "2026-10-23T16:10:33.573635+00:00",
+  "raw_path": "data/public/legalbench/abercrombie/test.tsv",
+  "raw_bytes": 5771,
+  "raw_sha256": "8e2e9051584fa6da66ba14a6a65310b03053af39869a5673ee43a9e378debab8",
+  "normalized_jsonl_path": "data/public/legalbench/abercrombie/test.jsonl",
+  "normalized_jsonl_bytes": 13919,
+  "normalized_jsonl_sha256": "16251a72c290245a881da933073c27901241c21ec9870b8154a26ab122236498",
+  "normalization": "TSV quoting removed by the CSV parser; index converted to integer; source answer/text values otherwise preserved.",
+  "note": "This is source benchmark data, not model output or evidence of SCRS effectiveness."
+}\n
