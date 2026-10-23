@@ -5,9 +5,10 @@
   "display_name": "LegalBench",
   "upstream_project": "https://github.com/HazyResearch/legalbench",
   "dataset_homepage": "https://huggingface.co/datasets/nguha/legalbench",
+  "source_file_pattern": "data/{task}/{split}.tsv",
+  "upstream_revision_endpoint": "https://huggingface.co/api/datasets/nguha/legalbench",
   "official_task_catalog": "https://hazyresearch.stanford.edu/legalbench/tasks/",
   "official_download_guide": "https://hazyresearch.stanford.edu/legalbench/getting-started/",
-  "retrieval_api": "https://datasets-server.huggingface.co",
   "status": "one-task-pilot-approved",
   "policy": "fail-closed; only tasks with explicit task-page licence evidence and redistribution permission may be downloaded by this script",
   "task_allowlist": {
@@ -18,25 +19,25 @@
       "license_spdx": "CC-BY-4.0",
       "license_url": "https://creativecommons.org/licenses/by/4.0/",
       "license_evidence": "The official task page explicitly states 'License: CC BY 4.0'.",
-      "attribution": "LegalBench (task: abercrombie), source: Neel Guha; CC BY 4.0. Cite the LegalBench paper and task page.",
+      "attribution": "LegalBench (task: abercrombie), source: Neel Guha; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
       "redistribution_allowed_with_attribution": true,
       "language": "English",
       "task_kind": "five-way trademark classification",
       "protocol_limitations": [
-        "This task validates retrieval/provenance plumbing and a narrow downstream task, not SCRS's full semantic preservation, retrieval, or runtime claims.",
-        "Do not hard-code expected row count; official page sample-count prose is inconsistent with train/test details and hosted data viewer.",
+        "This task validates acquisition/provenance plumbing and a narrow downstream task, not SCRS's full semantic preservation, retrieval, or runtime claims.",
+        "Do not hard-code an expected row count; record the count parsed from the pinned source file.",
         "Do not alter upstream labels or examples during ingestion."
       ]
     }
   },
   "deny_unlisted_tasks": true,
   "record_schema": {
-    "index": "zero-based row index from upstream dataset-server response where available",
+    "index": "integer value from the upstream index column",
     "task": "LegalBench task/config name",
     "split": "upstream split name",
-    "fields": "unchanged source row object"
+    "fields": "unchanged source row fields; index normalized from TSV text to an integer"
   },
-  "output_policy": "Produce normalized JSONL plus a run-manifest sidecar that records upstream full revision SHA, split, actual row count, retrieval time, output SHA-256, and attribution.",
+  "output_policy": "Save the raw TSV and normalized JSONL with a run-manifest sidecar that records upstream full revision SHA, source/output hashes, actual row count, retrieval time, and attribution.",
   "citation": {
     "paper": "Guha et al. (2023), LegalBench: A Collaboratively Built Benchmark for Measuring Legal Reasoning in Large Language Models, arXiv:2308.11462",
     "paper_url": "https://arxiv.org/abs/2308.11462"

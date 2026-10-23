@@ -5,7 +5,7 @@ This directory stores dataset provenance, approved retrieval manifests, small or
 ## Data policy
 
 - Do not commit third-party data until task-level licence and redistribution conditions have been reviewed.
-- Follow source attribution requirements, preserve the upstream record fields, and include a run manifest and SHA-256 for every downloaded artifact.
+- Follow source attribution requirements, preserve upstream fields, and include a run manifest and SHA-256 for every downloaded artifact.
 - Prefer canonical upstream retrieval and hashes over manually reconstructed copies.
 - Keep train/development/test splits separate; never tune on the final test split.
 - Keep public-benchmark results, synthetic simulations, and real deployment measurements separate and label them clearly.
@@ -16,7 +16,7 @@ This directory stores dataset provenance, approved retrieval manifests, small or
 - `fixtures/scrs_adversarial_cases.jsonl` — 12 original hand-authored examples for invariants such as deadline, exception, threshold, jurisdiction, tenant scope, negation, and evidence admissibility. These are test fixtures, not empirical results.
 - `manifests/legalbench.json` — fail-closed allowlist for the single reviewed LegalBench pilot task `abercrombie`.
 - `manifests/legalbenchrag.json` — LegalBench-RAG provenance and a blocked data-ingestion decision pending source-specific licence review.
-- `scripts/data/acquire_public_evidence.py` — standard-library retrieval, revision pinning, JSONL export, and checksum/provenance generation.
+- `scripts/data/acquire_public_evidence.py` — standard-library retrieval from an immutable upstream revision, TSV-to-JSONL normalization, and checksum/provenance generation.
 
 ## Run the approved pilot
 
@@ -27,7 +27,7 @@ python scripts/data/acquire_public_evidence.py --task abercrombie --split test
 python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
 ```
 
-The downloader queries the public Hugging Face dataset-server API and does not need a model/API key. It records the actual row count; no fixed expected count is assumed because public source metadata has an inconsistency.
+The downloader pins a full source commit SHA and retrieves the original `data/abercrombie/{split}.tsv` file from that revision. It records the actual row count, raw-source SHA-256, normalized-output SHA-256, licence, attribution, and retrieval timestamp.
 
 ## What is not yet present
 

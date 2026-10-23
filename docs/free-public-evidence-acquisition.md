@@ -23,7 +23,7 @@ Public benchmarks can test retrieval, task-answer consistency, evidence groundin
 
 ### Pilot limitations
 
-The approved `abercrombie` task is a small, five-way trademark-classification task. It can validate acquisition/provenance plumbing and a narrow downstream task-preservation protocol; it does **not** directly test SCRS's full semantic-capsule, legal reasoning, retrieval, or cost claims. The official task page's sample-count prose is internally inconsistent with the train/test description and the hosted data viewer, so the downloader records the observed row count instead of hard-coding an expected count.
+The approved `abercrombie` task is a small, five-way trademark-classification task. It can validate acquisition/provenance plumbing and a narrow downstream task-preservation protocol; it does **not** directly test SCRS's full semantic-capsule, legal reasoning, retrieval, or cost claims. Public task metadata contains a sample-count inconsistency, so the downloader records the actual count parsed from the pinned source file instead of hard-coding an expected count.
 
 ## 3. Dataset inclusion and licence gate
 
@@ -65,7 +65,7 @@ Until real traces exist, keep scenario outputs labelled **synthetic** and report
 
 ## 7. Retrieval and reproducibility
 
-The standard-library-only script `scripts/data/acquire_public_evidence.py` retrieves only task/split combinations explicitly approved in a manifest. It resolves the current Hugging Face revision to a full commit SHA, writes normalized JSONL and a run manifest, and calculates a SHA-256 of the produced file. Review generated provenance before committing benchmark data.
+The standard-library-only script `scripts/data/acquire_public_evidence.py` retrieves only task/split combinations explicitly approved in a manifest. It resolves the upstream dataset to a full commit SHA, downloads the original TSV at that immutable revision, then writes the raw source copy, normalized JSONL, and a run manifest with hashes and attribution.
 
 Example (from repository root):
 
@@ -74,7 +74,7 @@ python scripts/data/acquire_public_evidence.py --task abercrombie --split test
 python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
 ```
 
-The script uses the public Hugging Face dataset-server API; no model/API key is required. If an external endpoint is unavailable, rerun later and record the failure rather than substituting manually copied or synthetic data.
+No model/API key is required. If an external endpoint is unavailable, rerun later and record the failure rather than substituting manually copied or synthetic data. The generated row count is taken from the actual parsed source file; it is not assumed from potentially inconsistent secondary metadata.
 
 ## 8. Sources
 
