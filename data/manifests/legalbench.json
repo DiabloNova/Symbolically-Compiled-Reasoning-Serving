@@ -9,7 +9,7 @@
   "upstream_revision_endpoint": "https://huggingface.co/api/datasets/nguha/legalbench",
   "official_task_catalog": "https://hazyresearch.stanford.edu/legalbench/tasks/",
   "official_download_guide": "https://hazyresearch.stanford.edu/legalbench/getting-started/",
-  "status": "six-task-pilot-approved",
+  "status": "six-task-allowlist-approved",
   "policy": "fail-closed; only tasks with explicit task-page licence evidence and redistribution permission may be downloaded by this script",
   "task_allowlist": {
     "abercrombie": {
@@ -27,6 +27,13 @@
         "This task validates acquisition/provenance plumbing and a narrow downstream task, not SCRS's full semantic preservation, retrieval, or runtime claims.",
         "Do not hard-code an expected row count; record the count parsed from the pinned source file.",
         "Do not alter upstream labels or examples during ingestion."
+      ],
+      "labels": [
+        "generic",
+        "descriptive",
+        "suggestive",
+        "arbitrary",
+        "fanciful"
       ]
     },
     "contract_qa": {
@@ -45,6 +52,10 @@
         "This is clause-issue identification, not a test of the full SCRS capsule compiler or retrieval pipeline.",
         "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
         "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ],
+      "labels": [
+        "Yes",
+        "No"
       ]
     },
     "ucc_v_common_law": {
@@ -63,6 +74,10 @@
         "The task description excludes mixed-purpose contracts for simplicity; preserve that source limitation.",
         "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
         "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ],
+      "labels": [
+        "UCC",
+        "Common Law"
       ]
     },
     "function_of_decision_section": {
@@ -81,6 +96,15 @@
         "The label set describes rhetorical/procedural function; accuracy is not a general semantic-preservation guarantee.",
         "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
         "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ],
+      "labels": [
+        "Facts",
+        "Procedural History",
+        "Issue",
+        "Rule",
+        "Analysis",
+        "Conclusion",
+        "Decree"
       ]
     },
     "legal_reasoning_causality": {
@@ -99,6 +123,10 @@
         "The task is drawn from labor-market discrimination opinions and does not represent all legal reasoning domains.",
         "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
         "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ],
+      "labels": [
+        "Yes",
+        "No"
       ]
     },
     "citation_prediction_classification": {
@@ -117,6 +145,10 @@
         "The official page warns that the post-2023 sample may be less informative for models trained on those cases.",
         "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
         "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ],
+      "labels": [
+        "Yes",
+        "No"
       ]
     }
   },

@@ -31,6 +31,15 @@ class LegalBenchScoringTests(unittest.TestCase):
         self.assertAlmostEqual(result["macro_f1"], 1.0)
         self.assertEqual(result["label_support"], {"descriptive": 1, "generic": 2})
 
+    def test_declared_task_label_absent_from_sample_is_still_valid(self):
+        result = score_rows(
+            [gold_row(0, "generic")],
+            [{"index": 0, "prediction": "generic"}],
+            allowed_labels=["generic", "descriptive"],
+        )
+        self.assertEqual(result["labels"], ["descriptive", "generic"])
+        self.assertEqual(result["per_class"]["descriptive"]["support"], 0)
+
     def test_mismatched_or_duplicate_indices_fail_closed(self):
         gold = [gold_row(0, "generic"), gold_row(1, "descriptive")]
         with self.assertRaises(ScoringError):

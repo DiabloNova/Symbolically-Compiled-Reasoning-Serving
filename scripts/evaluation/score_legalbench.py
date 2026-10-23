@@ -92,6 +92,8 @@ def wilson_interval(successes: int, total: int, z: float = 1.959963984540054) ->
 def score_rows(
     gold_records: list[dict[str, Any]],
     prediction_records: list[dict[str, Any]],
+    *,
+    allowed_labels: list[str] | None = None,
 ) -> dict[str, Any]:
     gold_by_index = _unique_index_map(gold_records, index_field="index", context="Gold data")
     predictions_by_index = _unique_index_map(
@@ -119,10 +121,21 @@ def score_rows(
             row.get("prediction"), context=f"Prediction at index {index}"
         )
 
-    labels = sorted(set(gold_labels.values()))
+    if allowed_labels is None:
+        labels = sorted(set(gold_labels.values()))
+    else:
+        if not isinstance(allowed_labels, list) or not allowed_labels:
+            raise ScoringError("The source run manifest must declare a non-empty allowed_labels list.")
+        normalized_allowed = [normalized_label(label, context="Allowed task label") for label in allowed_labels]
+        labels = sorted(set(normalized_allowed))
+        if len(labels) != len(normalized_allowed):
+            raise ScoringError("Allowed task labels contain duplicates after normalization.")
+        unexpected_gold = sorted(set(gold_labels.values()) - set(labels))
+        if unexpected_gold:
+            raise ScoringError(f"Gold data contains labels not declared by the task manifest: {unexpected_gold}.")
     unknown = sorted(set(predicted_labels.values()) - set(labels))
     if unknown:
-        raise ScoringError(f"Predictions contain labels absent from gold labels: {unknown}.")
+        raise ScoringError(f"Predictions contain labels outside the task label inventory: {unknown}.")
 
     confusion = {actual: {predicted: 0 for predicted in labels} for actual in labels}
     correct = 0
@@ -198,7 +211,10 @@ def evaluate_files(
         raise ScoringError(f"Cannot read source run manifest {source_manifest_path}: {exc}") from exc
     if source_manifest.get("normalized_jsonl_sha256") != sha256_file(gold_path):
         raise ScoringError("Gold data SHA-256 does not match its source run manifest.")
-    metrics = score_rows(gold, predictions)
+    allowed_labels = source_manifest.get("allowed_labels")
+    if not isinstance(allowed_labels, list) or not allowed_labels:
+        raise ScoringError("Source run manifest lacks the task-specific allowed_labels inventory.")
+    metrics = score_rows(gold, predictions, allowed_labels=allowed_labels)
     return {
         "schema_version": SCHEMA_VERSION,
         "evaluation_type": "public-benchmark-scoring-of-supplied-predictions",

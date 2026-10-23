@@ -1,106 +1,82 @@
-# Free public evidence acquisition plan for SCRS
+# Free public evidence acquisition and evaluation plan for SCRS
 
-**Status:** source review and acquisition tooling in progress. No SCRS performance result is claimed as measured by this plan.  
-**Goal:** create a reproducible, zero-cost public-data workflow that improves the manuscript's evidence without overstating what a benchmark can establish.  
-**Data policy:** preserve provenance and licences. Do not commit raw data unless task-level reuse and redistribution terms have been checked. Never treat public availability as proof of permission to redistribute.
+**Status:** licence-reviewed datasets and reproducible tooling are available in the research branch. This is evidence preparation, not an SCRS model evaluation. **No baseline or SCRS predictions have been generated.**
 
-## 1. Evidence classes
+## Evidence classes and decision rule
 
-Label every artifact and claim as **theoretical**, **public-benchmark evaluation**, **synthetic/simulated**, **measured deployment**, **literature-supported**, or **unresolved**.
+Every claim must be labeled one of: **theoretical/proved**, **public-benchmark evaluation**, **synthetic/simulated**, **measured deployment**, **literature-supported**, or **unresolved**. A passing software test over original fixtures is not a benchmark score. A public benchmark can test task-level label preservation or evidence retrieval; it cannot establish provider billing, production network latency, or the paper's projected savings by itself.
 
-Public benchmarks can test retrieval, task-answer consistency, evidence grounding, transfer-gate behavior, and software-level invariants. They cannot by themselves establish production API costs, provider billing, network round trips, or deployment latency.
+## Dataset sources and licensing decisions
 
-## 2. Candidate sources and current decisions
+The LegalBench upstream project says licences vary by task. Only the six task pages below explicitly state **CC BY 4.0** and have been allowlisted in `data/manifests/legalbench.json`. Unlisted tasks are denied by default. The task-level permissions and attribution text are preserved in the manifest and per-split run metadata.
 
-| Resource | Intended use | Source / licence status | Decision |
-|---|---|---|---|
-| [LegalBench](https://hazyresearch.stanford.edu/legalbench/) | Downstream legal-task correctness; task-specific answer consistency | The project says licences vary by task. The [Abercrombie task page](https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html) explicitly states CC BY 4.0. | **Pilot approved for attributed reuse:** only `abercrombie` is allowlisted in `data/manifests/legalbench.json`. Do not assume other tasks are approved. |
-| [LegalBench getting started](https://hazyresearch.stanford.edu/legalbench/getting-started/) | Canonical prompts and evaluation guidance | Official project guidance; task-specific protocols apply. | Use source evaluation details; report task-level scores, not a blended score across unlike tasks. |
-| [LegalBench-RAG repository](https://github.com/ZeroEntropy-AI/legalbenchrag) | Exact character-span evidence retrieval and grounding | Repository code is MIT-licensed, but the linked data bundle does not provide a single licence covering every underlying document; the project names ContractNLI, CUAD, MAUD, and PrivacyQA terms. | **Metadata/research candidate only.** Do not download into the repo, redistribute, or use the bundled corpus until source-specific permissions have been checked. |
-| [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/cli/bench/) | Reusable local serving benchmark procedures and TTFT/TPOT/ITL/E2E definitions | Public tooling; no SCRS runtime claim follows from the tooling itself. | Pin the tool version and disclose cache/workload configuration for any serving experiment. |
-| [vLLM benchmark harness](https://github.com/vllm-project/vllm-bench) | Reusable harness and machine-readable runtime outputs | Public source repository. | Treat as a measurement tool, not a dataset or evidence of SCRS effectiveness. |
-| [FRAMES discovery listing](https://rag-repo.org/datasets/) | Candidate multi-hop retrieval/reasoning stress tests | Listing is a discovery index, not the canonical licence record. | Do not acquire before locating the canonical source, exact revision, split, and licence. |
+| Task | Test examples in pinned snapshot | Intended probe | Official task page |
+|---|---:|---|---|
+| `abercrombie` | 95 | Five-way trademark classification | https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html |
+| `contract_qa` | 80 | Clause/question issue identification | https://hazyresearch.stanford.edu/legalbench/tasks/contract_qa.html |
+| `ucc_v_common_law` | 94 | Distinguish UCC from common-law contract treatment | https://hazyresearch.stanford.edu/legalbench/tasks/ucc_v_common_law.html |
+| `function_of_decision_section` | 367 | Legal opinion section function classification | https://hazyresearch.stanford.edu/legalbench/tasks/function_of_decision_section.html |
+| `legal_reasoning_causality` | 55 | Whether reasoning invokes statistical evidence | https://hazyresearch.stanford.edu/legalbench/tasks/legal_reasoning_causality.html |
+| `citation_prediction_classification` | 108 | Whether a cited case supports a statement | https://hazyresearch.stanford.edu/legalbench/tasks/citation_prediction_classification.html |
 
-### Pilot limitations
+The public snapshot is pinned to Hugging Face dataset revision `daec8237410aa23e3faf4bc41ad8b3a7e1696826`. The pinned source file, not a potentially inconsistent overview-page sample count, is the source of observed split counts. There are 32 train examples and 799 test examples (831 total rows) across six task configurations. The train splits are very small for several tasks; they should not be described as robust training datasets or pooled into a single unqualified accuracy figure.
 
-The approved `abercrombie` task is a small, five-way trademark-classification task. It can validate acquisition/provenance plumbing and a narrow downstream task-preservation protocol; it does **not** directly test SCRS's full semantic-capsule, legal reasoning, retrieval, or cost claims. Public task metadata contains a sample-count inconsistency, so the downloader records the actual count parsed from the pinned source file instead of hard-coding an expected count.
+- Dataset home: https://huggingface.co/datasets/nguha/legalbench
+- LegalBench paper: Guha et al. (2023), https://arxiv.org/abs/2308.11462
+- CC BY 4.0 legal code: https://creativecommons.org/licenses/by/4.0/
+- LegalBench task-by-task licensing policy: https://hazyresearch.stanford.edu/legalbench/tasks/
 
-## 3. Dataset inclusion and licence gate
+### LegalBench-RAG remains blocked
 
-Before importing any additional task, record:
+The canonical repository is https://github.com/ZeroEntropy-AI/legalbenchrag and the paper is https://arxiv.org/abs/2408.10343. Its code licence does not establish a single redistribution licence for the linked corpus, which refers to ContractNLI, CUAD, MAUD, and PrivacyQA. Therefore `data/manifests/legalbenchrag.json` records a **blocked pending source-specific licence review** decision. No LegalBench-RAG corpus is included in this branch. Similarly, FRAMES remains a discovery lead only until the canonical dataset source and licence are checked: https://rag-repo.org/datasets/.
 
-1. Canonical source, publisher, task page, exact source revision/commit, and retrieval timestamp.
-2. Licence for the specific task **and** for its underlying data; attribution, derivative-work, and redistribution conditions.
-3. Split, actual row count, fields used, filters, preprocessing rules, and any exclusions.
-4. SHA-256 of the downloaded source/artifact and byte size.
-5. Whether redistribution is explicitly permitted. If not, keep data outside the repository and commit only permitted metadata/scripts.
-6. Any personal/sensitive content or access restrictions. Publicly accessible does not automatically mean unrestricted.
-7. Evaluation mapping: original input, gold output/evidence, baseline output, transformed/capsule output, scoring rule, and human-review requirements.
+## Retrieval and data integrity
 
-The acquisition script enforces a fail-closed task allowlist. Do not weaken the gate merely to make a task downloadable.
+`scripts/data/acquire_public_evidence.py` is standard-library-only and requires no API/model key. It fails closed unless the task is allowlisted, task-level reuse is recorded, and the task's label inventory is declared. It pins a full upstream commit SHA (or accepts `--revision` for exact reproduction), downloads the original TSV, preserves task-specific columns (for example `contract`, `Citation`, and `Paragraph` rather than assuming `text`), and writes:
 
-## 4. Minimum SCRS evaluation protocol
+- raw TSV copy;
+- normalized JSONL representation;
+- `*.run-manifest.json` with source URL/revision, task licence and attribution, row count, source/output bytes and SHA-256, label inventory, and retrieval timestamp.
 
-For each properly licensed task, compare at least:
-
-- **Original-context baseline:** solve using the uncompressed source context.
-- **Capsule-only:** solve using the representation generated by a pinned extractor.
-- **Capsule + compiled graph/gates:** apply declared graph execution and compatibility checks.
-- **Ablations:** remove one decision-relevant field or gate at a time.
-- **Adversarial counterexamples:** use paired examples differing in exactly one decision-relevant condition.
-
-Report task-level metrics, aggregate methodology, uncertainty intervals where meaningful, failure taxonomy, sample size, split, seed, model/version, prompt/config, and exact commands. Avoid prompt/threshold tuning against the final test split. Declare primary metrics and decision rules before running the final evaluation. Preserve original benchmark labels and do not silently “correct” source annotations.
-
-## 5. SCRS-specific original fixtures
-
-The original fixtures in `data/fixtures/scrs_adversarial_cases.jsonl` cover deadlines, thresholds, exceptions, jurisdiction, tenant scope, negation, and evidence admissibility. Add cases for exclusions, preconditions, transfer licence, adapter/version drift, graph termination/cycle rejection, typed bindings, and accounting invariants such as actual Anchor API attempts versus logical Anchor events.
-
-These fixtures are author-created software tests, not independent benchmark results. Their pass rate must never be presented as model accuracy or empirical validation of the paper's broader claims.
-
-## 6. Runtime and cost evidence policy
-
-Do not derive empirical P50/P95 latency from expected-value equations. Real cost/latency evidence needs an implementation commit, environment/hardware, model/provider and dated pricing source, request IDs, logical Anchor count, actual HTTP attempts, retries, batching/cache hits, token counts, stage timestamps, fallback status, errors/timeouts, and billed usage where available. Redact request content and secrets.
-
-Until real traces exist, keep scenario outputs labelled **synthetic** and report sensitivity analyses over declared assumptions. Public benchmark runs may validate algorithmic properties and local runtime but cannot prove provider billing or production network behavior.
-
-## 7. Retrieval and reproducibility
-
-The standard-library-only script `scripts/data/acquire_public_evidence.py` retrieves only task/split combinations explicitly approved in a manifest. It resolves the upstream dataset to a full commit SHA, downloads the original TSV at that immutable revision, then writes the raw source copy, normalized JSONL, and a run manifest with hashes and attribution.
-
-Example (from repository root):
+A ready-to-extract snapshot is stored at `data/public/legalbench/extra-licensed-snapshots-v1.tar.gz`. Its SHA-256 and contents are documented in `data/public/legalbench/README.md`. Extract from the repository root:
 
 ```bash
-python scripts/data/acquire_public_evidence.py --task abercrombie --split test
-python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
+tar -xzf data/public/legalbench/extra-licensed-snapshots-v1.tar.gz -C .
 ```
 
-No model/API key is required. If an external endpoint is unavailable, rerun later and record the failure rather than substituting manually copied or synthetic data. The generated row count is taken from the actual parsed source file; it is not assumed from potentially inconsistent secondary metadata.
+Re-acquire one task split from the exact same source revision:
 
-## 8. Sources
+```bash
+python scripts/data/acquire_public_evidence.py --task function_of_decision_section --split test --revision daec8237410aa23e3faf4bc41ad8b3a7e1696826
+```
 
-- Stanford LegalBench overview: https://hazyresearch.stanford.edu/legalbench/
-- Official task licence record for Abercrombie: https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html
-- LegalBench task-level licence policy: https://hazyresearch.stanford.edu/legalbench/tasks/
-- LegalBench getting started: https://hazyresearch.stanford.edu/legalbench/getting-started/
-- LegalBench-RAG upstream: https://github.com/ZeroEntropy-AI/legalbenchrag
-- vLLM benchmark CLI: https://docs.vllm.ai/en/latest/cli/bench/
-- vLLM benchmark harness: https://github.com/vllm-project/vllm-bench
-- FRAMES discovery listing: https://rag-repo.org/datasets/
-## 9. Prediction scoring adapter
+The downloader should also be tested without a network connection for parsing, task allowlist failure, revision format, normalization determinism, and checksum metadata.
 
-`scripts/evaluation/score_legalbench.py` scores externally generated predictions; it does **not** call a model and does not generate SCRS predictions. Prediction input is JSONL with one record per source index, for example `{"index": 0, "prediction": "generic"}`. Every gold index must occur exactly once; unknown indices and labels absent from the task are rejected. Normalization is limited to trimming surrounding whitespace and case-folding; no semantic aliases are applied.
+## Evaluation protocol required before paper claims
 
-Example:
+For each selected task separately, compare at least: (1) original-context baseline, (2) capsule-only condition, and (3) capsule plus compiled graph and compatibility gates. Where the goal is to isolate the representation change, hold the model/version, input examples, decoding settings, and scoring rules constant. Add predeclared ablations for individual decision-relevant fields and compatibility gates. Keep all model tuning on a development split, not test. Preserve source gold labels, and document any human grading.
+
+`scripts/evaluation/score_legalbench.py` scores **supplied prediction files only**; it does not invoke a model. One prediction per test index is required, with the shape `{"index": 0, "prediction": "generic"}`. It rejects missing/duplicate/extra indices and labels outside the task inventory, normalizes labels only by whitespace trimming and case-folding, and reports accuracy with Wilson 95% interval, macro precision/recall/F1, per-class metrics, and a confusion matrix. Example:
 
 ```bash
 python scripts/evaluation/score_legalbench.py \
   --predictions results/public-benchmarks/abercrombie/original-context/predictions.jsonl \
   --condition original-context \
   --model-id "record-the-exact-model-id" \
-  --method-description "Document the prompt and environment here" \
+  --method-description "Record prompt, adapter, and environment here" \
   --output results/public-benchmarks/abercrombie/original-context/metrics.json
 ```
 
-Run each experimental condition separately on the same pinned split: original context, capsule only, and capsule plus compiled graph/gates. Use the same model/version and predeclared decoding settings where the goal is to isolate representation changes. A comparison is not complete until predictions from an actual baseline and an actual SCRS implementation are available. The scorer reports accuracy, macro precision/recall/F1, per-class measures, confusion matrix, and a Wilson 95% interval for accuracy. Do not score the original synthetic fixtures as if they were benchmark samples.
+Use the same gold split when evaluating each condition. Report task-specific metrics and confidence intervals separately rather than treating unlike legal tasks as interchangeable. A data acquisition run or a scorer test is not evidence that SCRS outperforms a baseline.
 
-**Current status:** the CC BY 4.0 `abercrombie` test split is committed with attribution and an immutable source revision. The 95-row raw TSV and normalized JSONL SHA-256 values match the run manifest; the test labels are balanced at 19 records for each of five classes. Acquisition and scoring unit tests pass. No model predictions or measured SCRS comparison have been produced; current SCRS runtime scenarios remain synthetic.
+## Runtime and cost evidence policy
+
+Do not label expectations from equations or Monte Carlo projections as measured P50/P95. Real latency/cost claims require a runnable implementation commit, environment/hardware, dated provider pricing and model revision, logical Anchor count, actual HTTP attempts and retries, batch/cache hits, input/output token counts, stage timestamps, fallback status, errors/timeouts, and provider-billed usage when available. Public benchmarks cannot independently establish actual provider billing or production latency. vLLM benchmark tooling (https://docs.vllm.ai/en/latest/cli/bench/) may be used as a serving instrument but does not itself validate SCRS.
+
+## Reproduction checks performed
+
+- Acquisition tests: 9 passed.
+- Scorer tests: 7 passed.
+- Python compile check: `python3 -m compileall -q scripts tests` passed.
+- Local data validation: all 12 train/test split triples (TSV, JSONL, manifest) matched their recorded row counts and both SHA-256 hashes.
+- These checks validate tooling and data integrity only; they do not score a model. Existing latency/cost scenarios remain synthetic until actual implementation traces are captured.

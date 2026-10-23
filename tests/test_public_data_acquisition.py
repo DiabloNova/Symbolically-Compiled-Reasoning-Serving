@@ -16,6 +16,7 @@ from acquire_public_evidence import (  # noqa: E402
     load_manifest,
     parse_tsv,
     sha256_bytes,
+    validate_revision,
 )
 
 
@@ -37,6 +38,7 @@ class PublicDataAcquisitionTests(unittest.TestCase):
                 info = approved_task_info(self.manifest, task)
                 self.assertEqual(info["license_spdx"], "CC-BY-4.0")
                 self.assertTrue(info["redistribution_allowed_with_attribution"])
+                self.assertTrue(info["labels"])
 
     def test_unreviewed_task_fails_closed(self):
         with self.assertRaises(AcquisitionError):
@@ -58,6 +60,13 @@ class PublicDataAcquisitionTests(unittest.TestCase):
         with self.assertRaises(AcquisitionError):
             approved_task_info(manifest, "unsafe")
 
+    def test_explicit_revision_must_be_full_git_sha(self):
+        self.assertEqual(validate_revision("A" * 40), "a" * 40)
+        with self.assertRaises(AcquisitionError):
+            validate_revision("main")
+        with self.assertRaises(AcquisitionError):
+            validate_revision("a" * 39)
+
     def test_tsv_parser_preserves_text_and_converts_index(self):
         source = (
             'index\tanswer\ttext\n'
@@ -69,6 +78,15 @@ class PublicDataAcquisitionTests(unittest.TestCase):
         self.assertEqual(rows[0]["index"], 0)
         self.assertEqual(rows[0]["fields"]["text"], "The deadline is 30 days after service.")
         self.assertEqual(rows[1]["fields"]["text"], 'Do not waive the exception: "emergency" applies.')
+
+    def test_tsv_parser_preserves_task_specific_input_columns(self):
+        source = b"index\tcontract\tanswer\n0\tBob agrees to sell a car to Alice.\tUCC\n"
+        rows = parse_tsv(source, "ucc_v_common_law", "test")
+        self.assertEqual(rows[0]["fields"], {
+            "index": 0,
+            "contract": "Bob agrees to sell a car to Alice.",
+            "answer": "UCC",
+        })
 
     def test_tsv_parser_rejects_bad_header_and_duplicate_index(self):
         with self.assertRaises(AcquisitionError):

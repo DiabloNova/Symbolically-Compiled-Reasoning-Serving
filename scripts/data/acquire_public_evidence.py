@@ -12,6 +12,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -21,7 +22,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-SCRIPT_VERSION = "1.1.0"
+SCRIPT_VERSION = "1.3.0"
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MANIFEST = ROOT / "data" / "manifests" / "legalbench.json"
 DEFAULT_OUTPUT_ROOT = ROOT / "data" / "public" / "legalbench"
@@ -57,10 +58,22 @@ def approved_task_info(manifest: dict[str, Any], task: str) -> dict[str, Any]:
         raise AcquisitionError(
             f"Task {task!r} lacks an explicit redistribution permission decision."
         )
-    for field in ("task_page", "task_license", "license_url", "attribution"):
+    for field in ("task_page", "task_license", "license_url", "attribution", "labels"):
         if not info.get(field):
-            raise AcquisitionError(f"Task {task!r} lacks required licence field {field!r}.")
+            raise AcquisitionError(f"Task {task!r} lacks required licence/label field {field!r}.")
+    labels = info.get("labels")
+    if not isinstance(labels, list) or not labels or any(not isinstance(x, str) or not x.strip() for x in labels):
+        raise AcquisitionError(f"Task {task!r} must define a non-empty list of allowed labels.")
+    if len({x.strip().casefold() for x in labels}) != len(labels):
+        raise AcquisitionError(f"Task {task!r} has duplicate labels after normalization.")
     return info
+
+
+def validate_revision(revision: str) -> str:
+    """Validate an explicit immutable upstream Git commit SHA."""
+    if not isinstance(revision, str) or re.fullmatch(r"[0-9a-fA-F]{40}", revision) is None:
+        raise AcquisitionError("Explicit --revision must be a full 40-character hexadecimal Git SHA.")
+    return revision.lower()
 
 
 def request_bytes(url: str, *, attempts: int = 3) -> bytes:
@@ -69,7 +82,7 @@ def request_bytes(url: str, *, attempts: int = 3) -> bytes:
         req = Request(
             url,
             headers={
-                "User-Agent": "SCRS-public-evidence-acquisition/1.1 (+research reproducibility)",
+                "User-Agent": "SCRS-public-evidence-acquisition/1.3 (+research reproducibility)",
                 "Accept": "*/*",
             },
         )
@@ -112,11 +125,11 @@ def parse_tsv(source_bytes: bytes, task: str, split: str) -> list[dict[str, Any]
     except UnicodeDecodeError as exc:
         raise AcquisitionError(f"Upstream TSV is not valid UTF-8: {exc}") from exc
     reader = csv.DictReader(io.StringIO(decoded, newline=""), delimiter="\t")
-    expected = {"index", "answer", "text"}
+    required = {"index", "answer"}
     fieldnames = set(reader.fieldnames or [])
-    if not expected.issubset(fieldnames):
+    if not required.issubset(fieldnames) or len(fieldnames) < 3:
         raise AcquisitionError(
-            f"Unexpected TSV header {reader.fieldnames!r}; required columns: {sorted(expected)}"
+            f"Unexpected TSV header {reader.fieldnames!r}; required columns: index, answer, and at least one task-input field"
         )
     records: list[dict[str, Any]] = []
     seen_indexes: set[int] = set()
@@ -132,13 +145,16 @@ def parse_tsv(source_bytes: bytes, task: str, split: str) -> list[dict[str, Any]
         if index in seen_indexes:
             raise AcquisitionError(f"Duplicate upstream row index {index}.")
         seen_indexes.add(index)
-        if source_row.get("answer") is None or source_row.get("text") is None:
-            raise AcquisitionError(f"Missing answer/text at physical line {line_number}.")
-        fields = {
-            "index": index,
-            "answer": source_row["answer"],
-            "text": source_row["text"],
-        }
+        if source_row.get("answer") is None or any(
+            source_row.get(field) is None for field in fieldnames - {"index", "answer"}
+        ):
+            raise AcquisitionError(
+                f"Missing answer or task-input value at physical line {line_number}."
+            )
+        # Preserve all task-specific source columns (e.g., contract, Citation,
+        # Paragraph); only normalize the index column from TSV text to integer.
+        fields = dict(source_row)
+        fields["index"] = index
         records.append({"index": index, "task": task, "split": split, "fields": fields})
     if not records:
         raise AcquisitionError("Upstream TSV contained no data rows.")
@@ -173,7 +189,8 @@ def atomic_write(path: Path, content: bytes) -> None:
 
 
 def acquire(
-    manifest_path: Path, task: str, split: str, output_root: Path
+    manifest_path: Path, task: str, split: str, output_root: Path,
+    revision: str | None = None,
 ) -> tuple[Path, Path]:
     manifest = load_manifest(manifest_path)
     task_info = approved_task_info(manifest, task)
@@ -186,7 +203,11 @@ def acquire(
         raise AcquisitionError("Manifest is missing a valid HTTPS revision endpoint.")
     if not isinstance(pattern, str) or "{task}" not in pattern or "{split}" not in pattern:
         raise AcquisitionError("Manifest source_file_pattern must include {task} and {split}.")
-    revision = resolve_upstream_revision(dataset_id, endpoint)
+    revision = (
+        resolve_upstream_revision(dataset_id, endpoint)
+        if revision is None
+        else validate_revision(revision)
+    )
     source_path = pattern.format(task=task, split=split)
     # Keep the dataset ID's owner/repository slash but URL-escape each user-controlled segment.
     source_path_url = "/".join(quote(part, safe="") for part in source_path.split("/"))
@@ -215,7 +236,8 @@ def acquire(
         "upstream_source_path": source_path,
         "upstream_source_url": source_url,
         "rows_written": len(records),
-        "columns": ["index", "answer", "text"],
+        "allowed_labels": task_info["labels"],
+        "columns": list(records[0]["fields"].keys()),
         "task_license": task_info["task_license"],
         "task_license_spdx": task_info.get("license_spdx"),
         "task_license_url": task_info["license_url"],
@@ -228,7 +250,7 @@ def acquire(
         "normalized_jsonl_path": str(jsonl_path.relative_to(ROOT)) if jsonl_path.is_relative_to(ROOT) else str(jsonl_path),
         "normalized_jsonl_bytes": len(normalized_bytes),
         "normalized_jsonl_sha256": sha256_bytes(normalized_bytes),
-        "normalization": "TSV quoting removed by the CSV parser; index converted to integer; source answer/text values otherwise preserved.",
+        "normalization": "TSV quoting removed by the CSV parser; index converted to integer; all other task-specific source fields and values preserved.",
         "note": "This is source benchmark data, not model output or evidence of SCRS effectiveness."
     }
     atomic_write(
@@ -243,11 +265,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--task", required=True, help="Exact task-licensed allowlist key")
     parser.add_argument("--split", required=True, choices=("train", "test"))
+    parser.add_argument("--revision", help="Optional immutable 40-character upstream Git SHA for exact reproduction")
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     args = parser.parse_args(argv)
     try:
         jsonl_path, run_manifest_path = acquire(
-            args.manifest, args.task, args.split, args.output_root
+            args.manifest, args.task, args.split, args.output_root, args.revision
         )
     except (AcquisitionError, json.JSONDecodeError) as exc:
         print(f"acquisition failed: {exc}", file=sys.stderr)
