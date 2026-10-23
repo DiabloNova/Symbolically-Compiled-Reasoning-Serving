@@ -91,7 +91,7 @@ Define the empirical incorrect-acceptance rate as
 \frac{N_{\mathrm{incorrect\_accept}}}
 {N_{\mathrm{known\_incompatible\_cases}}}.
 \]
-Do not use a denominator that mixes compatible and incompatible cases. Report the numerator, denominator, dataset construction, and an appropriate binomial confidence interval. If zero incorrect acceptances are observed, report “0 observed in n tested incompatible cases” with the interval; do not report a proven population rate of zero.
+Do not use a denominator that mixes compatible and incompatible cases. For a prespecified random sample, report the numerator, denominator, dataset construction, sampling model, and a 95% Clopper–Pearson interval; for a fixed adversarial suite, report finite-set counts without population inference. If zero incorrect acceptances are observed, report “0 observed in n tested incompatible cases” with the interval; do not report a proven population rate of zero.
 
 The test suite should also report compatible-case rejection separately, since a gate that rejects everything would trivially avoid incorrect acceptance but would not be useful.
 
