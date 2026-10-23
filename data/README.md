@@ -18,6 +18,7 @@ This directory stores source-provenance manifests, an attributed public benchmar
 - `public/legalbench/extra-licensed-snapshots-v1.tar.gz` — complete six-task snapshot: 12 splits × raw TSV, normalized JSONL, and run manifest (36 files). Pinned to source revision `daec8237410aa23e3faf4bc41ad8b3a7e1696826`. See `public/legalbench/README.md` for attribution, counts, and archive hash.
 - `scripts/data/acquire_public_evidence.py` — standard-library, immutable-revision downloader with task-specific column preservation and SHA-256 provenance.
 - `scripts/evaluation/score_legalbench.py` — strict scorer for externally generated prediction JSONL; does not call models or produce predictions.
+- `scripts/data/verify_public_evidence_snapshot.py` — offline verifier for archive SHA-256, task licences, pinned revision, TSV/JSONL equivalence, sidecar hashes, row counts, and labels.
 
 ## Tests and commands
 
@@ -25,6 +26,8 @@ This directory stores source-provenance manifests, an attributed public benchmar
 python scripts/data/acquire_public_evidence.py --task abercrombie --split test --revision daec8237410aa23e3faf4bc41ad8b3a7e1696826
 python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
 python -m unittest discover -s tests -p 'test_legalbench_scoring.py' -v
+python -m unittest discover -s tests -p 'test_public_evidence_snapshot_verification.py' -v
+python scripts/data/verify_public_evidence_snapshot.py
 ```
 
 The data snapshot is input/gold data only. No baseline predictions, SCRS predictions, model accuracy comparison, or measured deployment performance are included in this data acquisition stage.
