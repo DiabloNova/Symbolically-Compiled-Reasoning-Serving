@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "purpose": "Illustrative fixture manifest for the reference contract; not production test data.",
+  "cases": [
+    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true},
+    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false},
+    {"id": "missing-domain", "expected": "DOMAIN_MISSING", "compatible": false},
+    {"id": "stale-contract", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false},
+    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false},
+    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false},
+    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false}
+  ]
+}
