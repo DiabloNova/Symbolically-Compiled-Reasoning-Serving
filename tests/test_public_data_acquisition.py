@@ -25,10 +25,18 @@ class PublicDataAcquisitionTests(unittest.TestCase):
         cls.manifest_path = REPO_ROOT / "data" / "manifests" / "legalbench.json"
         cls.manifest = load_manifest(cls.manifest_path)
 
-    def test_manifest_approves_only_reviewed_abercrombie_task(self):
-        info = approved_task_info(self.manifest, "abercrombie")
-        self.assertEqual(info["license_spdx"], "CC-BY-4.0")
-        self.assertTrue(info["redistribution_allowed_with_attribution"])
+    def test_manifest_approves_only_explicitly_reviewed_tasks(self):
+        expected = {
+            "abercrombie", "contract_qa", "ucc_v_common_law",
+            "function_of_decision_section", "legal_reasoning_causality",
+            "citation_prediction_classification",
+        }
+        self.assertEqual(set(self.manifest["task_allowlist"]), expected)
+        for task in sorted(expected):
+            with self.subTest(task=task):
+                info = approved_task_info(self.manifest, task)
+                self.assertEqual(info["license_spdx"], "CC-BY-4.0")
+                self.assertTrue(info["redistribution_allowed_with_attribution"])
 
     def test_unreviewed_task_fails_closed(self):
         with self.assertRaises(AcquisitionError):

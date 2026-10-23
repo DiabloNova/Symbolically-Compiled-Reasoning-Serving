@@ -9,7 +9,7 @@
   "upstream_revision_endpoint": "https://huggingface.co/api/datasets/nguha/legalbench",
   "official_task_catalog": "https://hazyresearch.stanford.edu/legalbench/tasks/",
   "official_download_guide": "https://hazyresearch.stanford.edu/legalbench/getting-started/",
-  "status": "one-task-pilot-approved",
+  "status": "six-task-pilot-approved",
   "policy": "fail-closed; only tasks with explicit task-page licence evidence and redistribution permission may be downloaded by this script",
   "task_allowlist": {
     "abercrombie": {
@@ -27,6 +27,96 @@
         "This task validates acquisition/provenance plumbing and a narrow downstream task, not SCRS's full semantic preservation, retrieval, or runtime claims.",
         "Do not hard-code an expected row count; record the count parsed from the pinned source file.",
         "Do not alter upstream labels or examples during ingestion."
+      ]
+    },
+    "contract_qa": {
+      "status": "approved",
+      "task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/contract_qa.html",
+      "task_license": "CC BY 4.0",
+      "license_spdx": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence": "The official LegalBench task page explicitly states CC BY 4.0; independently checked on 2026-10-23.",
+      "attribution": "LegalBench task contract_qa; source: Nikon Rasumov-Rahe, Aditya Narayana, and Dmitry Talisman; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+      "redistribution_allowed_with_attribution": true,
+      "language": "English",
+      "task_kind": "binary classification / contract interpretation",
+      "task_description": "Binary classification of whether contract clauses discuss specified legal issues",
+      "protocol_limitations": [
+        "This is clause-issue identification, not a test of the full SCRS capsule compiler or retrieval pipeline.",
+        "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
+        "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ]
+    },
+    "ucc_v_common_law": {
+      "status": "approved",
+      "task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/ucc_v_common_law.html",
+      "task_license": "CC BY 4.0",
+      "license_spdx": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence": "The official LegalBench task page explicitly states CC BY 4.0; independently checked on 2026-10-23.",
+      "attribution": "LegalBench task ucc_v_common_law; source: Spencer Williams; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+      "redistribution_allowed_with_attribution": true,
+      "language": "English",
+      "task_kind": "binary classification / rule application and conclusion",
+      "task_description": "Determine whether a contract is governed by the UCC or common law",
+      "protocol_limitations": [
+        "The task description excludes mixed-purpose contracts for simplicity; preserve that source limitation.",
+        "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
+        "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ]
+    },
+    "function_of_decision_section": {
+      "status": "approved",
+      "task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/function_of_decision_section.html",
+      "task_license": "CC BY 4.0",
+      "license_spdx": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence": "The official LegalBench task page explicitly states CC BY 4.0; independently checked on 2026-10-23.",
+      "attribution": "LegalBench task function_of_decision_section; source: Gregory M. Dickinson; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+      "redistribution_allowed_with_attribution": true,
+      "language": "English",
+      "task_kind": "seven-way classification / legal discourse structure",
+      "task_description": "Classify the function of a section of a legal written opinion",
+      "protocol_limitations": [
+        "The label set describes rhetorical/procedural function; accuracy is not a general semantic-preservation guarantee.",
+        "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
+        "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ]
+    },
+    "legal_reasoning_causality": {
+      "status": "approved",
+      "task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/legal_reasoning_causality.html",
+      "task_license": "CC BY 4.0",
+      "license_spdx": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence": "The official LegalBench task page explicitly states CC BY 4.0; independently checked on 2026-10-23.",
+      "attribution": "LegalBench task legal_reasoning_causality; source: Haggai Porat and Tom Zur; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+      "redistribution_allowed_with_attribution": true,
+      "language": "English",
+      "task_kind": "binary classification / rhetorical analysis of reasoning",
+      "task_description": "Classify whether a judicial reasoning excerpt relies on statistical evidence",
+      "protocol_limitations": [
+        "The task is drawn from labor-market discrimination opinions and does not represent all legal reasoning domains.",
+        "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
+        "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
+      ]
+    },
+    "citation_prediction_classification": {
+      "status": "approved",
+      "task_page": "https://hazyresearch.stanford.edu/legalbench/tasks/citation_prediction_classification.html",
+      "task_license": "CC BY 4.0",
+      "license_spdx": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_evidence": "The official LegalBench task page explicitly states CC BY 4.0; independently checked on 2026-10-23.",
+      "attribution": "LegalBench task citation_prediction_classification; source: Michael Livermore and Daniel N. Rockmore; licensed under CC BY 4.0. Cite the LegalBench paper and task page.",
+      "redistribution_allowed_with_attribution": true,
+      "language": "English",
+      "task_kind": "binary classification / citation support",
+      "task_description": "Determine whether a cited case supports a legal statement",
+      "protocol_limitations": [
+        "The official page warns that the post-2023 sample may be less informative for models trained on those cases.",
+        "This allowlist entry is task-page-specific and must not be inferred to cover other LegalBench tasks.",
+        "Preserve upstream gold labels and record observed row counts instead of relying on secondary sample-count summaries."
       ]
     }
   },
