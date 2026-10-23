@@ -28,4 +28,4 @@
   "normalized_jsonl_sha256": "16251a72c290245a881da933073c27901241c21ec9870b8154a26ab122236498",
   "normalization": "TSV quoting removed by the CSV parser; index converted to integer; source answer/text values otherwise preserved.",
   "note": "This is source benchmark data, not model output or evidence of SCRS effectiveness."
-}\n
+}

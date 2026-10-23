@@ -1,6 +1,6 @@
 # Data and evaluation assets
 
-This directory stores dataset provenance, approved retrieval manifests, small original fixtures, and scripts/instructions for repeatable evaluation.
+This directory stores dataset provenance, approved retrieval manifests, original SCRS fixtures, and the inputs/results needed for repeatable evaluation.
 
 ## Data policy
 
@@ -13,22 +13,29 @@ This directory stores dataset provenance, approved retrieval manifests, small or
 
 ## Current assets
 
-- `fixtures/scrs_adversarial_cases.jsonl` — 12 original hand-authored examples for invariants such as deadline, exception, threshold, jurisdiction, tenant scope, negation, and evidence admissibility. These are test fixtures, not empirical results.
+- `fixtures/scrs_adversarial_cases.jsonl` — 12 original hand-authored examples for invariants such as deadline, exception, threshold, jurisdiction, tenant scope, negation, and evidence admissibility. These are software test fixtures, not empirical results.
 - `manifests/legalbench.json` — fail-closed allowlist for the single reviewed LegalBench pilot task `abercrombie`.
 - `manifests/legalbenchrag.json` — LegalBench-RAG provenance and a blocked data-ingestion decision pending source-specific licence review.
+- `public/legalbench/abercrombie/` — attributed CC BY 4.0 test split, upstream TSV, normalized JSONL, and run manifest. The snapshot is pinned to upstream revision `daec8237410aa23e3faf4bc41ad8b3a7e1696826`.
 - `scripts/data/acquire_public_evidence.py` — standard-library retrieval from an immutable upstream revision, TSV-to-JSONL normalization, and checksum/provenance generation.
+- `scripts/evaluation/score_legalbench.py` — strict offline scoring for prediction JSONL. It does not run models or generate predictions.
 
-## Run the approved pilot
+## Reproduce acquisition and tests
 
 From the repository root:
 
 ```bash
 python scripts/data/acquire_public_evidence.py --task abercrombie --split test
 python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
+python -m unittest discover -s tests -p 'test_legalbench_scoring.py' -v
 ```
 
-The downloader pins a full source commit SHA and retrieves the original `data/abercrombie/{split}.tsv` file from that revision. It records the actual row count, raw-source SHA-256, normalized-output SHA-256, licence, attribution, and retrieval timestamp.
+The downloader pins a full source commit SHA and retrieves `data/abercrombie/{split}.tsv`. The committed test snapshot has 95 rows, balanced across five labels (19 each). The raw and normalized checksums are in `public/legalbench/abercrombie/test.run-manifest.json`.
 
-## What is not yet present
+## Produce and score predictions
 
-No third-party benchmark data or benchmark result is currently committed in this PR. The script must be run to produce a revision-pinned artifact; inspect its generated manifest and the resulting file before deciding to track the data. Do not ingest LegalBench-RAG's bundled corpus until its underlying data terms have been individually checked.
+Write a JSONL prediction file, one line per test row: `{"index": 0, "prediction": "generic"}`. Run `python scripts/evaluation/score_legalbench.py --help` for the required parameters. Do not generate placeholder predictions and present their scores as model evidence.
+
+## Important limitation
+
+The approved `abercrombie` task is a small five-way trademark-classification task. It validates data and scoring infrastructure but is not sufficient evidence for SCRS semantic-capsule correctness, legal reasoning performance, retrieval quality, latency, or cost. The repository currently contains no model predictions for this task and no measured SCRS comparison.
