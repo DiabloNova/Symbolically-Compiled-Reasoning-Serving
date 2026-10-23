@@ -1,91 +1,90 @@
 # Free public evidence acquisition plan for SCRS
 
-**Status:** source-discovery baseline; no result here is claimed as measured SCRS performance.  
-**Goal:** establish a reproducible, zero-cost public-data pipeline for strengthening the SCRS manuscript.  
-**Policy:** preserve provenance and licence terms. Do not commit third-party raw data until redistribution rights, file size, and source integrity are checked. Prefer manifests, deterministic retrieval scripts, checksums, and small derived fixtures.
+**Status:** source review and acquisition tooling in progress. No SCRS performance result is claimed as measured by this plan.  
+**Goal:** create a reproducible, zero-cost public-data workflow that improves the manuscript's evidence without overstating what a benchmark can establish.  
+**Data policy:** preserve provenance and licences. Do not commit raw data unless task-level reuse and redistribution terms have been checked. Never treat public availability as proof of permission to redistribute.
 
 ## 1. Evidence classes
 
 Label every artifact and claim as **theoretical**, **public-benchmark evaluation**, **synthetic/simulated**, **measured deployment**, **literature-supported**, or **unresolved**.
 
-Public benchmarks can test semantic preservation, retrieval, decision correctness, transfer-gate behavior, and reproducibility. They cannot establish real production API costs, provider billing, network round trips, or deployment latency.
+Public benchmarks can test retrieval, task-answer consistency, evidence grounding, transfer-gate behavior, and software-level invariants. They cannot by themselves establish production API costs, provider billing, network round trips, or deployment latency.
 
-## 2. Candidate public resources
+## 2. Candidate sources and current decisions
 
-| Resource | Intended use | Cost/access | Limitations |
+| Resource | Intended use | Source / licence status | Decision |
 |---|---|---|---|
-| [LegalBench](https://hazyresearch.stanford.edu/legalbench/) | Diverse legal reasoning tasks; decision-relevant fact preservation and downstream answer consistency | Public benchmark; task data via Hugging Face | Review each task's terms and evaluation requirements; some tasks need manual grading |
-| [LegalBench download/evaluation guide](https://hazyresearch.stanford.edu/legalbench/getting-started/) | Canonical download instructions, prompts, and evaluation guidance | Public documentation | Follow task-level protocols rather than merging all tasks into one score |
-| [LegalBench-RAG repository](https://github.com/zeroentropy-ai/legalbench) | Clause/span retrieval and evidence grounding; test whether a capsule preserves exact supporting evidence | Public repository; inspect current files and underlying dataset terms before redistribution | Packaging licence does not automatically cover every underlying document |
-| [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/cli/bench/) | Reusable local serving benchmark patterns and definitions for TTFT, TPOT, ITL, end-to-end latency, and throughput | Open-source tooling; local/synthetic workloads possible | Tooling does not itself provide SCRS evidence; real measurement needs a running system and documented environment |
-| [vLLM benchmark harness](https://github.com/vllm-project/vllm-bench) | Reproducible benchmark harness and machine-readable result patterns | Public source repository | Record exact version and workload; prefix-cache reuse can distort comparisons |
-| [FRAMES discovery listing](https://rag-repo.org/datasets/) | Candidate multi-hop retrieval/reasoning stress test | Public discovery listing | Verify canonical source, split, and licence before use |
+| [LegalBench](https://hazyresearch.stanford.edu/legalbench/) | Downstream legal-task correctness; task-specific answer consistency | The project says licences vary by task. The [Abercrombie task page](https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html) explicitly states CC BY 4.0. | **Pilot approved for attributed reuse:** only `abercrombie` is allowlisted in `data/manifests/legalbench.json`. Do not assume other tasks are approved. |
+| [LegalBench getting started](https://hazyresearch.stanford.edu/legalbench/getting-started/) | Canonical prompts and evaluation guidance | Official project guidance; task-specific protocols apply. | Use source evaluation details; report task-level scores, not a blended score across unlike tasks. |
+| [LegalBench-RAG repository](https://github.com/ZeroEntropy-AI/legalbenchrag) | Exact character-span evidence retrieval and grounding | Repository code is MIT-licensed, but the linked data bundle does not provide a single licence covering every underlying document; the project names ContractNLI, CUAD, MAUD, and PrivacyQA terms. | **Metadata/research candidate only.** Do not download into the repo, redistribute, or use the bundled corpus until source-specific permissions have been checked. |
+| [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/cli/bench/) | Reusable local serving benchmark procedures and TTFT/TPOT/ITL/E2E definitions | Public tooling; no SCRS runtime claim follows from the tooling itself. | Pin the tool version and disclose cache/workload configuration for any serving experiment. |
+| [vLLM benchmark harness](https://github.com/vllm-project/vllm-bench) | Reusable harness and machine-readable runtime outputs | Public source repository. | Treat as a measurement tool, not a dataset or evidence of SCRS effectiveness. |
+| [FRAMES discovery listing](https://rag-repo.org/datasets/) | Candidate multi-hop retrieval/reasoning stress tests | Listing is a discovery index, not the canonical licence record. | Do not acquire before locating the canonical source, exact revision, split, and licence. |
 
-**Initial priority:** start with a licence-reviewed subset of LegalBench and LegalBench-RAG. Add an original synthetic adversarial suite for SCRS-specific invariants: deadlines, thresholds, exceptions, exclusions, jurisdiction, evidence admissibility, tenant scope, adapter/version mismatch, and transfer denial. Expand to other domains only after the core protocol is stable.
+### Pilot limitations
 
-## 3. Dataset inclusion gate
+The approved `abercrombie` task is a small, five-way trademark-classification task. It can validate acquisition/provenance plumbing and a narrow downstream task-preservation protocol; it does **not** directly test SCRS's full semantic-capsule, legal reasoning, retrieval, or cost claims. The official task page's sample-count prose is internally inconsistent with the train/test description and the hosted data viewer, so the downloader records the observed row count instead of hard-coding an expected count.
 
-Before importing any dataset, record:
+## 3. Dataset inclusion and licence gate
 
-1. Canonical source, publisher, version/revision, retrieval date, and source commit/tag where available.
-2. Licence for both benchmark packaging and underlying data; redistribution and attribution requirements.
-3. Task/split, record count, fields used, filtering rules, and excluded records.
-4. Raw-file SHA-256, byte size, extraction command, and preprocessing version.
-5. Whether raw data may be committed. If not, commit the manifest, retrieval script, checksum, and local cache instructions only.
-6. Any personal/sensitive data, copyright restrictions, or access conditions; never upload restricted content.
-7. Evaluation mapping: input, gold evidence/answer, SCRS output, baseline output, scoring function, and human-review requirements.
+Before importing any additional task, record:
 
-## 4. Minimum evaluation protocol
+1. Canonical source, publisher, task page, exact source revision/commit, and retrieval timestamp.
+2. Licence for the specific task **and** for its underlying data; attribution, derivative-work, and redistribution conditions.
+3. Split, actual row count, fields used, filters, preprocessing rules, and any exclusions.
+4. SHA-256 of the downloaded source/artifact and byte size.
+5. Whether redistribution is explicitly permitted. If not, keep data outside the repository and commit only permitted metadata/scripts.
+6. Any personal/sensitive content or access restrictions. Publicly accessible does not automatically mean unrestricted.
+7. Evaluation mapping: original input, gold output/evidence, baseline output, transformed/capsule output, scoring rule, and human-review requirements.
 
-For each task, compare at least:
+The acquisition script enforces a fail-closed task allowlist. Do not weaken the gate merely to make a task downloadable.
+
+## 4. Minimum SCRS evaluation protocol
+
+For each properly licensed task, compare at least:
 
 - **Original-context baseline:** solve using the uncompressed source context.
-- **Capsule-only:** solve using the SCRS-extracted representation.
-- **Capsule + compiled graph/gates:** apply the declared decision graph and compatibility checks.
-- **Ablations:** remove one critical field or gate at a time.
-- **Adversarial counterexamples:** near-duplicate cases differing in exactly one decision-relevant condition.
+- **Capsule-only:** solve using the representation generated by a pinned extractor.
+- **Capsule + compiled graph/gates:** apply declared graph execution and compatibility checks.
+- **Ablations:** remove one decision-relevant field or gate at a time.
+- **Adversarial counterexamples:** use paired examples differing in exactly one decision-relevant condition.
 
-Report task-level and aggregate metrics, uncertainty intervals where appropriate, failure taxonomy, sample size, split, seeds, model/version, and exact commands. Avoid leakage between prompt development and final evaluation. Declare the primary metric and decision rule before final evaluation.
+Report task-level metrics, aggregate methodology, uncertainty intervals where meaningful, failure taxonomy, sample size, split, seed, model/version, prompt/config, and exact commands. Avoid prompt/threshold tuning against the final test split. Declare primary metrics and decision rules before running the final evaluation. Preserve original benchmark labels and do not silently “correct” source annotations.
 
-## 5. SCRS-specific tests to build
+## 5. SCRS-specific original fixtures
 
-The initial local fixture should cover:
+The original fixtures in `data/fixtures/scrs_adversarial_cases.jsonl` cover deadlines, thresholds, exceptions, jurisdiction, tenant scope, negation, and evidence admissibility. Add cases for exclusions, preconditions, transfer licence, adapter/version drift, graph termination/cycle rejection, typed bindings, and accounting invariants such as actual Anchor API attempts versus logical Anchor events.
 
-- Preservation of obligations, deadlines, thresholds, exceptions, exclusions, negation, and other decision-relevant facts.
-- Type-safe bindings, deterministic graph execution, termination, and cycle rejection.
-- Compatibility gates for domain, jurisdiction, adapter version, tenant scope, transfer licence, preconditions, and evidence admissibility.
-- Negative controls where a single gate mismatch must force a safe miss/bailout.
-- Counterexample pairs differing in one decision-relevant feature.
-- Algorithm-counter invariants, including n_int and oracleCallsAvoided.
-- Probability normalization and consistency among equations, tables, and generated outputs.
-
-These original fixtures are useful tests, but do not replace independent public-benchmark evaluation.
+These fixtures are author-created software tests, not independent benchmark results. Their pass rate must never be presented as model accuracy or empirical validation of the paper's broader claims.
 
 ## 6. Runtime and cost evidence policy
 
-Do not derive empirical P50/P95 from expected-value equations. For real latency/cost claims, capture implementation commit, environment/hardware, model/provider and pricing snapshot, request ID, logical anchor count, actual HTTP attempts, retries, batching/cache hits, input/output token counts, stage timestamps, fallback status, errors/timeouts, and billed usage when available. Redact request content and secrets.
+Do not derive empirical P50/P95 latency from expected-value equations. Real cost/latency evidence needs an implementation commit, environment/hardware, model/provider and dated pricing source, request IDs, logical Anchor count, actual HTTP attempts, retries, batching/cache hits, token counts, stage timestamps, fallback status, errors/timeouts, and billed usage where available. Redact request content and secrets.
 
-Until real traces exist, keep current scenario outputs labelled **synthetic** and report sensitivity analyses over declared assumptions. Public benchmark runs may validate algorithms and local runtime behavior, but cannot prove provider billing or production network behavior.
+Until real traces exist, keep scenario outputs labelled **synthetic** and report sensitivity analyses over declared assumptions. Public benchmark runs may validate algorithmic properties and local runtime but cannot prove provider billing or production network behavior.
 
-## 7. Proposed repository layout
+## 7. Retrieval and reproducibility
 
-- data/README.md — dataset catalogue, licence decisions, retrieval instructions.
-- data/manifests/*.json — source, licence, split, checksum, and preprocessing metadata.
-- data/fixtures/scrs_adversarial_cases.jsonl — small original test fixtures.
-- scripts/data/download_public_benchmarks.py — deterministic public-data retrieval and verification.
-- scripts/evaluation/run_public_benchmarks.py — benchmark adapters and metrics.
-- results/public-benchmarks/<run-id>/ — machine-readable results, configuration, logs, and manifest.
-- docs/research-validation-ledger.md — claim-to-evidence status and links to generated artifacts.
+The standard-library-only script `scripts/data/acquire_public_evidence.py` retrieves only task/split combinations explicitly approved in a manifest. It resolves the current Hugging Face revision to a full commit SHA, writes normalized JSONL and a run manifest, and calculates a SHA-256 of the produced file. Review generated provenance before committing benchmark data.
 
-Do not add large third-party data or change manuscript claims until the licence review, protocol, and reproducibility checks pass.
+Example (from repository root):
+
+```bash
+python scripts/data/acquire_public_evidence.py --task abercrombie --split test
+python -m unittest discover -s tests -p 'test_public_data_acquisition.py' -v
+```
+
+The script uses the public Hugging Face dataset-server API; no model/API key is required. If an external endpoint is unavailable, rerun later and record the failure rather than substituting manually copied or synthetic data.
 
 ## 8. Sources
 
-- Stanford LegalBench: https://hazyresearch.stanford.edu/legalbench/
+- Stanford LegalBench overview: https://hazyresearch.stanford.edu/legalbench/
+- Official task licence record for Abercrombie: https://hazyresearch.stanford.edu/legalbench/tasks/abercrombie.html
+- LegalBench task-level licence policy: https://hazyresearch.stanford.edu/legalbench/tasks/
 - LegalBench getting started: https://hazyresearch.stanford.edu/legalbench/getting-started/
-- LegalBench-RAG: https://github.com/zeroentropy-ai/legalbench
+- LegalBench-RAG upstream: https://github.com/ZeroEntropy-AI/legalbenchrag
 - vLLM benchmark CLI: https://docs.vllm.ai/en/latest/cli/bench/
 - vLLM benchmark harness: https://github.com/vllm-project/vllm-bench
 - FRAMES discovery listing: https://rag-repo.org/datasets/
 
-**Current status:** discovery only. Dataset files have not yet been imported, licence-reviewed, or evaluated under this plan.
+**Current status:** one LegalBench task has task-page licence evidence and is allowlisted for attributed retrieval. No benchmark output has yet been generated by this pipeline; current SCRS runtime scenarios remain synthetic.
