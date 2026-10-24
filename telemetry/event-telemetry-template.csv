@@ -1,0 +1,2 @@
+schema_version,request_id_hash,event_id,causal_interrupt_seq,attempt_number,event_type,parent_event_id,provider_request_id_redacted,batch_id,start_monotonic_ms,end_monotonic_ms,utc_correlation_timestamp,queue_wait_ms,ttft_ms,tpot_ms_per_token,input_tokens,input_token_basis,output_tokens,output_token_basis,evidence_status,provider_generation_evidence,provider_generation_unknown_reason,status,retry_reason,model,region,price_tier,ingest_replay_mark,ingest_conflict_flag
+2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
