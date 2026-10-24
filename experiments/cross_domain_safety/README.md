@@ -19,7 +19,17 @@ From this directory:
 python -m unittest -v
 ```
 
-Expected outcome: 13 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
+Expected outcome: 26 tests pass (24 hand-written unit tests + 2 manifest-driven conformance tests). The suite covers:
+
+- a compatible control case;
+- request-side **and** capsule-side missing domain / contract-version values;
+- equal-but-stale contract versions (version-currency rejection);
+- truthy non-boolean status values (e.g. the string `"unknown"`) failing closed for every boolean status;
+- canonicalization collision, uncertified, and unsupported mapping versions;
+- necessity of every required condition; and
+- the checked-in `fixtures.json` manifest, which is loaded by the tests and drives the expected decision/reason for each case.
+
+A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate. Policy-derived fixture labels make these conformance results, not end-to-end rates.
 
 ## Mapping to production
 

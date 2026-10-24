@@ -30,6 +30,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 
 ## Contents
 
+- `docs/section-5-cross-domain-safety.md` — cross-domain transfer safety: formal contract, conditional proposition, and reproducible validation protocol.
 - `docs/section-7-3-cost-latency.md` — execution regimes, expected usage, cost, and latency.
 - `docs/section-8-3-algorithm.md` — revised execution pipeline and algorithmic caveats.
 - `docs/section-8-4-telemetry.md` — telemetry requirements.
@@ -38,6 +39,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 - `docs/anchor-telemetry-audit-prior.md` — source-level audit findings.
 - `docs/research-validation-ledger.md` — claims and evidence ledger.
 - `docs/next-steps.md` — ordered validation plan.
+- `experiments/cross_domain_safety/` — executable reference model of the acceptance contract with its deterministic conformance/adversarial test suite and fixture manifest.
 - `telemetry/` — request/event telemetry template and schema.
 - `results/scenario-v2/` — reproducible synthetic simulation artifacts.
 
