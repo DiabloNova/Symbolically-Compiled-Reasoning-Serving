@@ -1,0 +1,71 @@
+# SCRS manuscript ↔ repository reconciliation
+
+**Review date:** 2026-10-24  
+**Scope:** Uploaded `SCRS_Manuscript.docx` versus current `main`, excluding any assumption that `zip/` is still a live directory; mathematical/logical consistency and reproducibility assets were inspected. This is an audit record, not a manuscript rewrite.
+
+## Source identity and repository state
+
+- Uploaded DOCX SHA-256: `3547b61b7ca59cbe026c4665166f624b7955e18a2eec2c90b1d22f70d021ebdd` (808,752 bytes). The DOCX ZIP integrity check passed; `word/media/image1.png` is present and readable.
+- Current `main` canonical English manuscript: [`manuscripts/SCRS_Manuscript.docx`](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/manuscripts/SCRS_Manuscript.docx), Git blob SHA `ffd186557d61fb470914b0b8bc27f81b7b187ba0` (781,278 bytes). Its blob SHA differs from the uploaded file's locally computed Git blob SHA `67d1404c21bddd6e30526c38eac8736cc98895fd`; they are different binary versions.
+- Current `main` has **no `zip/` directory**. PR #5 explicitly removed it and relocated its contents to canonical paths: [PR #5](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/pull/5), merge commit `c5d5aab0584088b0262cd6b826dad4ca6a9f6a26`.
+- Historical files at `zip/` before PR #5 were byte-identical to the corresponding current canonical files for the English manuscript and the safety-gate trio:
+  - old `zip/SCRS_Manuscript.docx` and current `manuscripts/SCRS_Manuscript.docx`: blob SHA `ffd186557d61fb470914b0b8bc27f81b7b187ba0`;
+  - old `zip/gate.py` and current `experiments/cross_domain_safety/gate.py`: `5165fb285a45eb89c7863fdb6b8061be97e463f5`;
+  - old `zip/test_gate.py` and current `experiments/cross_domain_safety/test_gate.py`: `036b6906adf395faf14f81d39dcc74854af310c7`;
+  - old `zip/fixtures.json` and current `experiments/cross_domain_safety/fixtures.json`: `8fc88555441f871d7830739cbe251a1843ec0613`.
+- **Step 3 disposition:** there is no current `zip/` data to replace. Re-creating it would reintroduce a duplicate source of truth that PR #5 intentionally removed. The historical zip copies do not resolve the difference between the uploaded manuscript and the current canonical manuscript; they are the same older repository artifact. No zip directory was recreated and no manuscript binary was overwritten.
+- The latest merge SHA reports no combined status checks/workflow runs through the connected GitHub interface. The recorded 26/26 pass is the reference gate suite only, not evidence that all main CI gates ran.
+
+## High-priority manuscript ↔ main differences
+
+| ID | Finding | Evidence in current main | Consequence |
+|---|---|---|---|
+| R1 | The uploaded manuscript's Table 2 row 8 reports **631** billed Oracle output tokens; the repository ledger records an older value **894** and marks the row inconsistent. | [Research validation ledger](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/docs/research-validation-ledger.md) | Manuscript and repository do not share a single canonical Table 2 version. |
+| R2 | The manuscript claims `table2.py` regenerates Table 2 and Figure 3, but `table2.py` is absent at the root, `scripts/`, and `results/scenario-v2/`. The existing scenario script is a separate Monte Carlo latency scenario, not the stated Table 2 generator. | [Scenario source](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/results/scenario-v2/SCRS_latency_scenario_v2.py), [scenario README](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/results/scenario-v2/README.md) | The claim that every Table 2 / Figure 3 value can currently be regenerated is not supported by the repository. |
+| R3 | Manuscript Table 2 reports Unified SCRS P50/P95 = **3.1 / 43.9 s**; current scenario-v2 results report **8.84 / 53.65 s**. Baseline is **44.4 / 62.2 s** in the manuscript versus **43.80 / 60.84 s** in scenario-v2. | [Scenario results CSV](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/results/scenario-v2/results.csv) | These may be distinct model versions, but the manuscript provides no reproducible mapping from the present scenario artifacts to Table 2. They must not be presented as one synchronized result set. |
+| R4 | Manuscript Section 9.1 defines (n_{anch}=1.4) as an **unconditional per-request** mean, while the repository scenario script defines 1.4 interrupts **conditional on a successful answer**. Its observed synthetic mean is 0.87027 anchor calls/request, consistent with roughly (0.62127\times1.4), not 1.4/request. | Scenario script and CSV above | Anchor cost and latency weighting differ materially depending on which definition is intended. |
+| R5 | The manuscript describes a 10,000-question, three-domain validation protocol. The checked-in public benchmark is a pinned LegalBench subset of **831 rows** (32 train, 799 test across six tasks), and the plan explicitly says no model predictions/scored reports exist yet. | [Experiment plan](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/results/public-benchmarks/experiment-plan.v1.json), [dataset README](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/data/public/legalbench/README.md) | The current dataset is useful acquisition evidence, not execution of the manuscript's full protocol or evidence for accuracy targets. |
+| R6 | Manuscript says a full reference stack implements Algorithm 1 and that table/figure scripts are released; current README/next-steps state that production SCRS/Anchor transport implementation and real telemetry are not verified, and the full Algorithm 1 implementation is not in the repository. | [README](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/README.md), [next steps](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/docs/next-steps.md) | Treat Algorithm 1 as a specification/pseudocode, not a demonstrated production implementation; transport-level API calls and billing remain unmeasured. |
+| R7 | Scenario manifest/README list an XLSX snapshot and PNG plot as present artifacts, but those two paths return 404 on current `main`. | [Scenario manifest](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/results/scenario-v2/manifest.json) | Scenario artifact inventory is stale/incomplete. |
+| R8 | Repository README/ledger still mention a CRC error in the supplied DOCX. The newly uploaded file is valid and has a different hash, so that note applies to an older source copy and should not be used to describe the newly uploaded file. | [README](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/README.md), [ledger](https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/docs/research-validation-ledger.md) | Source-version identity needs to be explicit before a manuscript update or release. |
+
+## Mathematical and logical audit of the uploaded manuscript
+
+### P0 — Resolve before relying on Table 2
+
+1. **Equation (17) / Table 2 output tokens.** With baseline full-Oracle output (N_{CoT}=2380) and (α_{eff}=0.62), the stated simplified formula gives (0.38\times2380=904.4) expected fallback output tokens before adding any positive Anchor output. With (1.4\times5=7) Anchor tokens, that is about **911.4**, not **631**. The old ledger's 894 is also inconsistent with the same assumptions. The generic repository replacement draft already gives the correct general regime-wise expression with separate conditional bailout and miss means; either use that form with explicit row-specific means or correct the table and script together.
+2. **(n_{anch}) changes meaning across sections.** Section 7.3 defines it as the expected number of Anchor calls conditional on a completed fast path, but Section 9.1 says it is an unconditional per-request mean. Equations (18) and (20) multiply it by (α_{eff}), which is appropriate only for the conditional definition. Fix the definition or remove the extra (α_{eff}) factor; align the scenario code, cost, and latency calculations.
+3. **Percentiles are not implied by expected-value equations.** Equations (17)–(20) do not determine P50/P95. Table 2 needs the exact simulation/trace generator, distribution assumptions, seed, and generated data. The existing scenario-v2 output is synthetic and does not reproduce Table 2's latency percentiles.
+4. **Input-token and cost rows are not reproducible from checked-in artifacts.** The manuscript's anchor-input assumptions do not expose a per-call stable/uncached split sufficient to recompute billed inputs; the existing scenario CSV has latency metrics but no matching token/cost ledger. The repository's validation ledger already marks dollar costs as not independently reproducible.
+
+### P1 — Formal specification and algorithm
+
+5. **Equation (3) does not operationally guarantee answer equivalence as written.** A small mutual-information loss bound is not itself a bound on answer disagreement or decision loss. Define the random variables and conditioning on the question explicitly, and state a measurable loss/error bound over the declared question family; validate it with golden answers.
+6. **Equation (5) overstates position-decoupled KV reuse unless hidden-state dependencies are constrained.** RoPE affects attention in earlier layers, so later-layer hidden states can already depend on position/context. Rotating stored keys at load time alone does not generally make a capsule equivalent to full re-encoding. Specify the exact cache construction, attention mask, which tokens are recomputed, and whether the result is exact or approximate; test answer-quality and latency deltas.
+7. **Equation (6) uses (odot) for the RoPE operation.** If this denotes elementwise multiplication, it is not the usual block-rotation/complex multiplication operation. Define the operator or replace it with a clearly defined rotation operator.
+8. **Equation (8) may conflict with the stated topology-isomorphism goal.** The text says symbol names are replaced by declared types, but the formula also hashes (operatorname{sort}(Sigma_{vars})). If that serialization includes original symbol names, renamed-but-isomorphic graphs will hash differently. Define canonicalization unambiguously and add rename-invariance tests.
+9. **Equation (10) does not visibly include the new canonicalization-injectivity and per-side version-currency checks.** The text later makes them implementation preconditions and Theorem 3 assumptions. Put them in the gate predicate or explicitly define them as mandatory preconditions to its evaluation.
+10. **Theorem 1's variance notation is ill-typed for a structured trace.** (operatorname{Var}(T_{exec}mid S_q,E_{rag})=0) is not defined for a string/graph-valued trace without an encoding. Prefer the direct statement (P(T_{exec}=t^*\mid S_q,E_{rag})=1) or zero conditional entropy, and state the runtime's determinism assumptions.
+11. **Equation (18) may double-count common latency.** (T_{bo}) is described as including retrieval and gate evaluation, while (T_{ext}+T_{ret}) is charged for every request. Define (T_{bo}) as incremental bailout-only time beyond common terms, or remove overlap.
+12. **Algorithm 1 has an undefined counter.** It initializes `n_anch`, `n_slm`, and `n_full`, but line 37 increments `n_anchor` without initializing it; later telemetry reads `n_anchor`. Define this returned-token counter separately or use one consistent name.
+13. **Tier I complexity notation needs correction/definition.** The expression in Section 4.3 uses (d_{model}^2) for the attention-arithmetic term and also includes the number of layers while saying “per layer.” Standard attention arithmetic scales with sequence-pair count times head/model width; separate projection and attention costs and clarify whether the layer factor is included.
+
+### P2 — Scope, schema, and documentation
+
+14. The paper appropriately labels Table 3 accuracy values as hypotheses and Section 9 as projection, not measurement. Preserve this distinction. The 26/26 gate tests in main are reference-model conformance only, not production-gate tests or an empirical false-transfer rate.
+15. Table 4's sample `valid_until` values are date-only strings although the declared timestamp type is an ISO-8601 instant; the threshold fact also omits provenance/confidence fields shown for the other fact. Align the example with the schema's required fields.
+16. The EBNF declares an `exception` production separately from `expr/primary`; clarify that `EXCL` is strictly an authoring-time macro and ensure the serialized capsule representation never relies on a runtime production that the parser does not accept.
+17. The workload statement “300,000 requests per month (10,000 per working day)” assumes 30 working days per month. Correct the arithmetic or change “working day” to “day.”
+18. The repository currently lacks the declared Table 2 generator and the listed XLSX/PNG scenario outputs. Do not claim clean-checkout regeneration until the exact artifacts and commands are present and tested.
+
+## Outcome of the zip comparison
+
+No files were written under `zip/`: that directory no longer exists on current `main`, and the historical copies inspected were byte-identical to the canonical main files listed above. Restoring them would duplicate canonical assets and would **not** reconcile the uploaded manuscript with the older repository manuscript. The remaining differences are therefore recorded above rather than hidden by copying an older binary.
+
+## Recommended order of resolution
+
+1. Lock manuscript version and hashes; explicitly decide whether the uploaded DOCX is the new canonical manuscript.
+2. Repair Equation (17), (n_{anch}) semantics, and the complete Table 2 token/cost/latency generator; regenerate Table 2 and Figure 3 from one source.
+3. Correct the formal definitions and KV-cache assumptions (items 5–10), then fix Algorithm 1 and latency accounting.
+4. Align the public benchmark plan and the manuscript's 10,000-question protocol; keep measured, synthetic, and design-target evidence separate.
+5. Restore or remove stale artifact inventory entries and update source-integrity notes.
