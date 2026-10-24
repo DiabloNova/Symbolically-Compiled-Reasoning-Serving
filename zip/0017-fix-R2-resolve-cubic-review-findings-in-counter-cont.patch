@@ -1,0 +1,272 @@
+From 54772fd59ee43887da40d1302db5215bbe32c119 Mon Sep 17 00:00:00 2001
+From: DiabloNova <diablonova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 16:12:17 +0000
+Subject: [PATCH 17/19] fix(R2): resolve cubic review findings in counter
+ contract and telemetry
+
+- Tri-state anchor_provider_generation_evidence (CONFIRMED/UNKNOWN/UNAVAILABLE
+  with mandatory reason codes); count advances only on CONFIRMED
+- Confirmed-response branch now names every counter update incl. per-generation
+  billing UNAVAILABLE(BILLING_FEED_MISSING) instead of zero
+- Timeout/error branch sets UNKNOWN reason codes; never advances generation count
+- Explicit mid-render halt/fallback branch: terminal_regime = FAST_PATH only on
+  clean EOS; every other exit reports FALLBACK with full_oracle_fallback_count
+- Mandatory ingestion dedup rule by stable event_id with conflict handling;
+  counters advanced only by the runtime state machine
+- telemetry-schema.json v2 + request/event CSV templates aligned with contract
+- next-steps.md names both instrumentation boundaries (runtime-event vs transport)
+---
+ docs/next-steps.md                            |  2 +-
+ docs/section-8-3-algorithm.md                 | 59 ++++++++++++++---
+ docs/section-8-4-telemetry.md                 | 10 +--
+ telemetry/event-telemetry-template.csv        |  2 +
+ .../implementation-telemetry-template.csv     |  3 +-
+ telemetry/telemetry-schema.json               | 64 +++++++++++++++----
+ 6 files changed, 113 insertions(+), 27 deletions(-)
+ create mode 100644 telemetry/event-telemetry-template.csv
+
+diff --git a/docs/next-steps.md b/docs/next-steps.md
+index e21fd8d..c7aa0d2 100644
+--- a/docs/next-steps.md
++++ b/docs/next-steps.md
+@@ -1,7 +1,7 @@
+ # Next steps, ordered by evidence dependency
+ 
+ 1. **Obtain source implementation:** provide the reference implementation repository/commit or source files for Anchor, interrupt handling, retries, batching, and fallback.
+-2. **Instrument transport semantics:** apply the Section 8.3 counter contract at the actual transport boundary; distinguish logical interrupts, attempts, provider-confirmed generations, and returned/billed tokens.
++2. **Instrument both counter boundaries:** apply the Section 8.3 counter contract at the correct boundary for each counter. The **runtime-event boundary** (inside the local runtime) owns `anchor_interrupt_count` and `full_oracle_fallback_count`; the **transport boundary** (inside the instrumented API client) owns `anchor_transport_attempt_count`, the tri-state `anchor_provider_generation_count`/`anchor_provider_generation_evidence`, `anchor_tokens_returned`/`anchor_tokens_billed`, and the full-Oracle attempt/generation counters. Runtime-event counters must never be incremented at the transport layer, and attempt counts must never be derived from logical events; only attempt counts belong at the transport boundary in the sense that every increment corresponds to an actual HTTP/API issuance or provider-evidence reconciliation.
+ 3. **Validate counter behavior:** test the cases specified in Section 8.3, including no interrupt, multiple interrupts, retries, unknown timeout outcomes, miss fallback, and halt followed by fallback.
+ 4. **Instrument telemetry:** implement the request-level and event-level records in Section 8.4; redact sensitive content and preserve unknown values rather than coercing them to zero.
+ 5. **Validate the equations:** test regime probabilities and expected token/cost formulas, retaining separate bailout and miss means when needed.
+diff --git a/docs/section-8-3-algorithm.md b/docs/section-8-3-algorithm.md
+index a981de3..1320215 100644
+--- a/docs/section-8-3-algorithm.md
++++ b/docs/section-8-3-algorithm.md
+@@ -8,14 +8,30 @@ The following counters have distinct units and scopes. They are request-scoped a
+ 
+ - `anchor_interrupt_count`: number of logical interrupt events raised by the local runtime. Increment exactly once when an interrupt condition is accepted and the runtime commits to requesting Anchor support. Do not increment for every token considered or every retry.
+ - `anchor_transport_attempt_count`: number of transport attempts initiated for Anchor requests, including retries. Increment at the transport boundary for each attempt.
+-- `anchor_provider_generation_count`: number of provider generations confirmed by provider response or billing evidence. A timed-out attempt with unknown provider outcome must be recorded as unknown, not silently counted as zero.
++- `anchor_provider_generation_count` and `anchor_provider_generation_evidence`: a **tri-state** observation. `anchor_provider_generation_evidence` is one of `CONFIRMED`, `UNKNOWN` (with a mandatory reason code such as `TIMEOUT_OUTCOME_UNKNOWN`, `TRANSPORT_ERROR`, or `PROVIDER_RESPONSE_MALFORMED`), or `UNAVAILABLE` (with a mandatory reason code such as `BILLING_FEED_MISSING`). `anchor_provider_generation_count` is incremented **only** in the `CONFIRMED` state; it is never advanced when the state is `UNKNOWN` or `UNAVAILABLE`. A timed-out attempt with unknown provider outcome must leave the evidence state `UNKNOWN`, not silently advance or reset the count to zero. The request summary must report the evidence state alongside the count, so a zero can never stand in for an unresolved or unavailable observation.
+ - `anchor_tokens_returned`: tokens present in successful Anchor responses, using the declared tokenizer and counting rule.
+-- `anchor_tokens_billed`: tokens the provider reports as billable. Keep this separate from returned tokens because retries, failed responses, minimum billing, or provider accounting may make them differ.
++- `anchor_tokens_billed`: tokens the provider reports as billable. Keep this separate from returned tokens because retries, failed responses, minimum billing, or provider accounting may make them differ. When no billing feed is available for a confirmed generation, record `anchor_tokens_billed` as `UNAVAILABLE` (reason `BILLING_FEED_MISSING`) for that generation rather than as zero.
+ - `full_oracle_fallback_count`: number of full-reasoning fallback operations initiated for the request. A fallback is caused by a miss or a halted execution; it is not an Anchor interrupt.
+ - `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: transport attempts and confirmed provider generations for full-reasoning fallback, tracked separately from Anchor support.
+ 
+ A logical interrupt, transport attempt, provider generation, and token are different units. Their counts are not assumed to be equal. The algorithm can define and increment logical events exactly; actual provider generations and billed tokens require provider-side evidence and must be marked unknown when that evidence is unavailable.
+ 
++### Counter boundaries
++
++Two distinct instrumentation boundaries are involved, and every counter belongs to exactly one of them:
++
++- **Runtime-event boundary (inside the local runtime):** `anchor_interrupt_count`, `full_oracle_fallback_count`. These are logical events the runtime raises; they are incremented exactly once per accepted event, independently of transport behavior.
++- **Transport boundary (inside the instrumented client):** `anchor_transport_attempt_count`, `anchor_provider_generation_count`/`anchor_provider_generation_evidence`, `anchor_tokens_returned`, `anchor_tokens_billed`, `full_oracle_transport_attempt_count`, `full_oracle_provider_generation_count`. These are incremented only where HTTP/API requests are actually issued or provider responses/billing evidence is reconciled.
++
++### Event identity and deduplication
++
++An event identifier alone does not prevent duplicate counting: a replayed callback or at-least-once delivery would otherwise duplicate records. The following deduplication rule is mandatory:
++
++1. Every event carries a stable `event_id` derived from `(request_id_hash, causal_interrupt_seq, attempt_number, event_type)`.
++2. The ingestion layer deduplicates by `event_id` **before** any aggregation: the first occurrence is stored, later occurrences with an identical payload are recorded as replay marks and never re-counted.
++3. If a later occurrence carries a conflicting payload, it is retained with a `conflict` flag and surfaced in the missing-data/conflict report; it does not update counters.
++4. Counters in Algorithm 1 are advanced by the runtime state machine at the increment points defined below; ingestion replay therefore cannot inflate them.
++
+ ## Corrected Algorithm 1 counter semantics
+ 
+ ```text
+@@ -43,16 +59,39 @@ On an admitted, validated candidate:
+                     increment anchor_transport_attempt_count
+                     emit an attempt event with outcome and retry metadata
+                 on confirmed provider response:
+-                    record provider generation evidence, returned tokens,
+-                    and provider-billed tokens separately
++                    increment anchor_provider_generation_count by 1
++                    set anchor_provider_generation_evidence = CONFIRMED
++                    add returned tokens to anchor_tokens_returned
++                    add provider-billed tokens to anchor_tokens_billed;
++                        if no billing feed covers this generation,
++                        mark that generation's billing as UNAVAILABLE
++                        (reason BILLING_FEED_MISSING) instead of zero
+                     append returned Anchor text to the answer
+-                on error:
+-                    record error and whether provider outcome is known;
++                on timeout or error:
++                    do NOT increment anchor_provider_generation_count;
++                    set anchor_provider_generation_evidence = UNKNOWN with the
++                        reason code (TIMEOUT_OUTCOME_UNKNOWN or TRANSPORT_ERROR);
++                    leave billing for this attempt UNKNOWN pending reconciliation;
++                    record the error and whether the provider outcome is known;
+                     apply the declared retry/fallback policy
+                 update cooldown state
++
++                if the retry/fallback policy now declares a mid-render halt
++                or fallback (for example: Anchor unrecoverable, render
++                mismatch, or max-token cap reached):
++                    terminal_regime = FALLBACK
++                    increment full_oracle_fallback_count when full fallback
++                        is initiated
++                    invoke full Oracle fallback through the instrumented
++                        client; record attempts, confirmed generations,
++                        token counts, and unknown outcomes as above
++                    retain all accumulated Anchor counter values
++                    emit request and event telemetry
++                    return the fallback answer and telemetry
+             else:
+                 append the local token
+ 
++        # reached EOS without any declared mid-render fallback
+         terminal_regime = FAST_PATH
+         emit request and event telemetry
+         return answer and telemetry
+@@ -66,7 +105,7 @@ On retrieval/admission miss:
+     return fallback answer and telemetry
+ ```
+ 
+-This is a counter contract, not a claim that a reference implementation or production trace already exists. The client instrumentation must be implemented at the actual transport boundary to count retries accurately.
++This is a counter contract, not a claim that a reference implementation or production trace already exists. The client instrumentation must be implemented at the actual transport boundary to count retries accurately. `terminal_regime = FAST_PATH` is assigned **only** when rendering reaches EOS without a declared mid-render halt or fallback; every other exit path from the rendering loop must pass through the mid-render fallback branch above, so a request that fell back after one or more Anchor interrupts is always reported as `FALLBACK` with a non-zero `full_oracle_fallback_count` and is never summarized as a fast-path success.
+ 
+ ## Replacement for `oracleCallsAvoided`
+ 
+@@ -80,11 +119,13 @@ For requests that terminate successfully on the fast path, report `full_oracle_f
+ 2. Fast path with one interrupt and one successful attempt: one logical interrupt, one transport attempt, and provider/token counts taken from the response and billing evidence.
+ 3. Fast path with multiple interrupts: each accepted interrupt increments the logical counter once; attempts and tokens accumulate independently.
+ 4. Retry after transport failure: one logical interrupt but multiple transport attempts; provider generation count follows evidence, not attempt count.
+-5. Timeout with unknown provider outcome: attempt is counted; provider generation/billing is unknown until evidence resolves it.
++5. Timeout with unknown provider outcome: attempt is counted; provider generation count is NOT incremented and the evidence state is `UNKNOWN` (reason `TIMEOUT_OUTCOME_UNKNOWN`) until evidence resolves it; billing for the attempt is `UNKNOWN`, not zero.
+ 6. Miss without any Anchor interrupt: full fallback is counted and fallback-avoided is false.
+ 7. Halt after one or more Anchor events: Anchor counters retain their accumulated values and full fallback is also counted.
++7a. Mid-render policy fallback (Anchor unrecoverable, render mismatch, or max-token cap after one or more interrupts): `terminal_regime = FALLBACK`, `full_oracle_fallback_count >= 1`, accumulated Anchor counters retained, and the request is never summarized as fast-path success.
+ 8. Empty or failed Anchor response: interrupt and attempt events remain visible; returned and billed token counts follow observed evidence and may differ.
+-9. Duplicate delivery or callback: event identifiers prevent a single logical event from being counted twice.
++9. Duplicate delivery or callback: ingestion deduplicates by the stable `event_id`; identical replays are marked and never re-counted; conflicting payloads are flagged and surfaced. The request-level counters are unchanged by replay.
+ 10. All request paths: every emitted counter has a documented unit, scope, and source of evidence; no unknown value is silently represented as zero.
++11. Missing billing feed: provider generation is `CONFIRMED` but billing is `UNAVAILABLE` (reason `BILLING_FEED_MISSING`); the returned-token count is still reported, and the billed-token summary carries the unavailable marker rather than a zero.
+ 
+ The pseudocode in the original manuscript used `n_int` for an interrupt counter but did not increment it. The replacement uses explicit names and a documented event boundary to remove that ambiguity.
+diff --git a/docs/section-8-4-telemetry.md b/docs/section-8-4-telemetry.md
+index 1483154..7c0f3b0 100644
+--- a/docs/section-8-4-telemetry.md
++++ b/docs/section-8-4-telemetry.md
+@@ -6,11 +6,11 @@ Collect a request-level record and a separate event-level record for each logica
+ 
+ Keep these quantities separate:
+ 
+-- `anchor_interrupt_count`: logical interrupt events accepted by the local runtime.
+-- `anchor_transport_attempt_count`: actual Anchor transport attempts, including retries.
+-- `anchor_provider_generation_count`: provider generations confirmed by response or billing evidence.
++- `anchor_interrupt_count`: logical interrupt events accepted by the local runtime (runtime-event boundary).
++- `anchor_transport_attempt_count`: actual Anchor transport attempts, including retries (transport boundary).
++- `anchor_provider_generation_count` with `anchor_provider_generation_evidence` ∈ {`CONFIRMED`, `UNKNOWN` + reason, `UNAVAILABLE` + reason}: a tri-state observation. The count is advanced only in the `CONFIRMED` state; `UNKNOWN`/`UNAVAILABLE` observations carry their reason codes and never collapse to zero.
+ - `anchor_tokens_returned`: tokens returned by successful Anchor responses.
+-- `anchor_tokens_billed`: tokens reported as billable by the provider.
++- `anchor_tokens_billed`: tokens reported as billable by the provider; per-generation `UNAVAILABLE` (reason `BILLING_FEED_MISSING`) when no billing feed covers a confirmed generation.
+ - `full_oracle_fallback_count`: full-reasoning fallback operations initiated after a miss or halt.
+ - `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: full-fallback attempts and confirmed generations, separate from Anchor activity.
+ 
+@@ -20,6 +20,8 @@ For each count, document its unit, request scope, increment point, and evidence
+ 
+ At minimum, event records should include: event ID; parent request ID; causal interrupt ID where applicable; event type; monotonic start/end times; UTC correlation timestamp; attempt number; retry/batch/cache status; provider request ID in redacted or pseudonymized form; outcome/error category; model and region; input/output token values and whether they are returned or billed; cost basis and price tier; and an explicit evidence status such as `observed`, `provider-confirmed`, `estimated`, or `unknown`.
+ 
++**Ingestion deduplication (mandatory).** Event identifiers alone do not prevent duplicate counting under at-least-once delivery. The ingestion layer must deduplicate by the stable `event_id` derived from `(request_id_hash, causal_interrupt_seq, attempt_number, event_type)` before any aggregation: identical replays are stored as replay marks and never re-counted; conflicting payloads are retained with a `conflict` flag and surfaced in the missing-data report. Request-level counters are advanced only by the runtime state machine at the increment points of Section 8.3, so ingestion replay cannot inflate them. State the conflict-rate alongside the missing-data rate in every aggregate report.
++
+ For local execution, capture candidate admission, gate result, deterministic-execution outcome, rendering start/end, interrupt predicate and accepted interrupt timestamp, partial tokens at halt, fallback start/end, and terminal regime. Use monotonic timestamps for duration calculations and UTC timestamps for cross-system correlation. State how duplicate events are deduplicated and how partial or missing records affect aggregates.
+ 
+ ## Derived metrics
+diff --git a/telemetry/event-telemetry-template.csv b/telemetry/event-telemetry-template.csv
+new file mode 100644
+index 0000000..e98f8e9
+--- /dev/null
++++ b/telemetry/event-telemetry-template.csv
+@@ -0,0 +1,2 @@
++schema_version,request_id_hash,event_id,causal_interrupt_seq,attempt_number,event_type,parent_event_id,provider_request_id_redacted,batch_id,start_monotonic_ms,end_monotonic_ms,utc_correlation_timestamp,queue_wait_ms,ttft_ms,tpot_ms_per_token,input_tokens,input_token_basis,output_tokens,output_token_basis,evidence_status,provider_generation_evidence,provider_generation_unknown_reason,status,retry_reason,model,region,price_tier,ingest_replay_mark,ingest_conflict_flag
++2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+diff --git a/telemetry/implementation-telemetry-template.csv b/telemetry/implementation-telemetry-template.csv
+index 09581a0..e98b879 100644
+--- a/telemetry/implementation-telemetry-template.csv
++++ b/telemetry/implementation-telemetry-template.csv
+@@ -1 +1,2 @@
+-request_id_hash,config_version,deployment_version,timestamp_utc,regime,request_start_monotonic_ms,request_end_monotonic_ms,queue_wait_ms,oracle_ttft_ms,oracle_tpot_ms_per_token,oracle_input_tokens,oracle_output_tokens,oracle_call_count,anchor_logical_event_count,anchor_api_attempt_count,anchor_retry_count,anchor_batched_call_count,anchor_total_input_tokens,anchor_total_output_tokens,slm_generation_start_ms,slm_generation_end_ms,slm_generated_tokens,slm_render_start_ms,slm_render_end_ms,halt_decision_ms,partial_local_tokens_at_halt,fallback_start_ms,fallback_end_ms,bailout_incremental_overhead_ms,provider_model,price_tier,cached_input_tokens,terminal_status,notes_redacted
++schema_version,request_id_hash,config_version,deployment_version,timestamp_utc,terminal_regime,regime,request_start_monotonic_ms,request_end_monotonic_ms,queue_wait_ms,anchor_interrupt_count,anchor_transport_attempt_count,anchor_provider_generation_count,anchor_provider_generation_evidence,anchor_provider_generation_unknown_reasons,anchor_tokens_returned,anchor_tokens_billed,anchor_tokens_billed_evidence,full_oracle_fallback_count,full_oracle_transport_attempt_count,full_oracle_provider_generation_count,full_oracle_fallback_avoided,full_oracle_fallback_avoided_evidence,oracle_ttft_ms,oracle_tpot_ms_per_token,oracle_input_tokens,oracle_output_tokens,oracle_call_count,anchor_retry_count,anchor_batched_call_count,anchor_total_input_tokens,anchor_total_output_tokens,slm_generation_start_ms,slm_generation_end_ms,slm_generated_tokens,slm_render_start_ms,slm_render_end_ms,halt_decision_ms,partial_local_tokens_at_halt,fallback_start_ms,fallback_end_ms,bailout_incremental_overhead_ms,provider_model,price_tier,cached_input_tokens,terminal_status,notes_redacted
++2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+diff --git a/telemetry/telemetry-schema.json b/telemetry/telemetry-schema.json
+index 10d15dc..a5ba93e 100644
+--- a/telemetry/telemetry-schema.json
++++ b/telemetry/telemetry-schema.json
+@@ -1,21 +1,61 @@
+ {
+-  "description": "One row per request. For true per-call analysis, store a separate event-level table with one row per API attempt.",
++  "schema_version": 2,
++  "contract": "Section 8.3 counter contract / Section 8.4 telemetry requirements (research/p0-r2-counter-fix)",
++  "description": "One row per request at the request level, plus a separate event-level table with one row per logical interrupt, transport attempt, provider response, and full-reasoning fallback operation. Event rows join to the request row by request_id_hash. Ingestion MUST deduplicate events by event_id before aggregation (identical replays are replay marks; conflicting payloads carry a conflict flag and never update counters).",
+   "request_level_fields": [
+-    "request_id_hash", "config_version", "deployment_version", "timestamp_utc", "regime",
+-    "request_start_monotonic_ms", "request_end_monotonic_ms", "queue_wait_ms", "oracle_ttft_ms",
+-    "oracle_tpot_ms_per_token", "oracle_input_tokens", "oracle_output_tokens", "oracle_call_count",
+-    "anchor_logical_event_count", "anchor_api_attempt_count", "anchor_retry_count",
+-    "anchor_batched_call_count", "anchor_total_input_tokens", "anchor_total_output_tokens",
++    "request_id_hash", "config_version", "deployment_version", "timestamp_utc",
++    "terminal_regime", "regime",
++    "request_start_monotonic_ms", "request_end_monotonic_ms", "queue_wait_ms",
++    "anchor_interrupt_count", "anchor_transport_attempt_count",
++    "anchor_provider_generation_count", "anchor_provider_generation_evidence", "anchor_provider_generation_unknown_reasons",
++    "anchor_tokens_returned", "anchor_tokens_billed", "anchor_tokens_billed_evidence",
++    "full_oracle_fallback_count", "full_oracle_transport_attempt_count", "full_oracle_provider_generation_count",
++    "full_oracle_fallback_avoided", "full_oracle_fallback_avoided_evidence",
++    "oracle_ttft_ms", "oracle_tpot_ms_per_token",
++    "oracle_input_tokens", "oracle_output_tokens", "oracle_call_count",
++    "anchor_retry_count", "anchor_batched_call_count", "anchor_total_input_tokens", "anchor_total_output_tokens",
+     "slm_generation_start_ms", "slm_generation_end_ms", "slm_generated_tokens",
+     "slm_render_start_ms", "slm_render_end_ms", "halt_decision_ms", "partial_local_tokens_at_halt",
+-    "fallback_start_ms", "fallback_end_ms", "bailout_incremental_overhead_ms", "provider_model",
+-    "price_tier", "cached_input_tokens", "terminal_status", "notes_redacted"
++    "fallback_start_ms", "fallback_end_ms", "bailout_incremental_overhead_ms",
++    "provider_model", "price_tier", "cached_input_tokens", "terminal_status", "notes_redacted"
+   ],
++  "request_level_field_semantics": {
++    "anchor_interrupt_count": "runtime-event boundary; incremented once per accepted logical interrupt (Section 8.3)",
++    "anchor_transport_attempt_count": "transport boundary; incremented per HTTP/API attempt including retries",
++    "anchor_provider_generation_count": "advanced ONLY when anchor_provider_generation_evidence = CONFIRMED",
++    "anchor_provider_generation_evidence": "tri-state: CONFIRMED | UNKNOWN | UNAVAILABLE",
++    "anchor_provider_generation_unknown_reasons": "mandatory reason codes: TIMEOUT_OUTCOME_UNKNOWN | TRANSPORT_ERROR | PROVIDER_RESPONSE_MALFORMED | BILLING_FEED_MISSING",
++    "anchor_tokens_billed_evidence": "CONFIRMED | UNAVAILABLE(BILLING_FEED_MISSING); UNAVAILABLE must not be recorded as zero",
++    "full_oracle_fallback_avoided": "tri-state true | false | UNKNOWN; true only when terminal_regime is known FAST_PATH and full_oracle_fallback_count = 0; means full-reasoning fallback was avoided, NOT that all Oracle/Anchor traffic was avoided",
++    "full_oracle_fallback_avoided_evidence": "KNOWN_TERMINAL_REGIME | UNKNOWN_TERMINAL_REGIME | UNRESOLVED_FALLBACK_OUTCOME"
++  },
+   "required_event_level_fields": [
+-    "request_id_hash", "event_id", "parent_event_id", "event_type", "provider_request_id_redacted",
+-    "attempt_number", "batch_id", "start_monotonic_ms", "end_monotonic_ms", "queue_wait_ms",
+-    "ttft_ms", "tpot_ms_per_token", "input_tokens", "output_tokens", "status", "retry_reason",
+-    "model", "region", "price_tier"
++    "request_id_hash", "event_id", "event_id_composition", "parent_event_id", "causal_interrupt_seq",
++    "event_type", "provider_request_id_redacted", "attempt_number", "batch_id",
++    "start_monotonic_ms", "end_monotonic_ms", "queue_wait_ms", "utc_correlation_timestamp",
++    "ttft_ms", "tpot_ms_per_token",
++    "input_tokens", "input_token_basis", "output_tokens", "output_token_basis",
++    "evidence_status", "provider_generation_evidence", "provider_generation_unknown_reason",
++    "status", "retry_reason", "model", "region", "price_tier",
++    "ingest_replay_mark", "ingest_conflict_flag"
++  ],
++  "event_level_field_semantics": {
++    "event_id": "stable identifier; ingestion deduplication key",
++    "event_id_composition": "(request_id_hash, causal_interrupt_seq, attempt_number, event_type)",
++    "event_type": "anchor_interrupt | anchor_transport_attempt | anchor_provider_response | full_oracle_fallback | full_oracle_transport_attempt | full_oracle_provider_response | gate_decision | render_lifecycle",
++    "input_token_basis": "returned | billed | estimated",
++    "output_token_basis": "returned | billed | estimated",
++    "evidence_status": "observed | provider-confirmed | estimated | unknown",
++    "ingest_replay_mark": "true when an identical event_id was ingested before; replays never re-count",
++    "ingest_conflict_flag": "true when a duplicate event_id carries a conflicting payload; conflicts are surfaced, never merged"
++  },
++  "derived_metric_rules": [
++    "Never emit oracleCallsAvoided = (n_int == 0).",
++    "full_oracle_fallback_avoided = true only for a known FAST_PATH terminal regime with full_oracle_fallback_count = 0.",
++    "Join request-level and event-level records before computing counts, token totals, cost, or latency distributions; report denominators, missing-data rates, and conflict rates.",
++    "Do not equate logical interrupts, transport attempts, provider generations, and token totals.",
++    "Do not infer provider billing from client-side attempts alone.",
++    "Do not coerce unknown or unavailable evidence to zero."
+   ],
+   "privacy": "Do not record API keys, raw prompts, full responses, or unredacted user identifiers."
+ }
+-- 
+2.47.3
+

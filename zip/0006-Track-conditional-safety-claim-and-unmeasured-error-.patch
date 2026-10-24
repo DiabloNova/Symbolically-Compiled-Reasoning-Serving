@@ -1,0 +1,24 @@
+From b5322ad75904e97cb6c32388a1333baa8bcc6839 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:34:19 +0330
+Subject: [PATCH 06/19] Track conditional safety claim and unmeasured error
+ rate
+
+---
+ docs/research-validation-ledger.md | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index bfd24bc..fbb972c 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,4 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
++| Cross-domain gate rejection property | Conditional specification drafted; implementation conformance unverified | `docs/section-5-cross-domain-safety.md` defines explicit assumptions, fail-closed semantics, and a test protocol; no code/test output is claimed | Implement or map the gate to reference code; run the published conformance and adversarial suite; report counts and confidence interval |
++| End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+-- 
+2.47.3
+

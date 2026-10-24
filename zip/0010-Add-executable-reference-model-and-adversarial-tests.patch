@@ -1,0 +1,35 @@
+From 6ce1a70387bde73a4ab154850f427d127b146694 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:43 +0330
+Subject: [PATCH 10/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/fixtures.json | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/fixtures.json
+
+diff --git a/experiments/cross_domain_safety/fixtures.json b/experiments/cross_domain_safety/fixtures.json
+new file mode 100644
+index 0000000..b78cd3a
+--- /dev/null
++++ b/experiments/cross_domain_safety/fixtures.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 1,
++  "purpose": "Illustrative fixture manifest for the reference contract; not production test data.",
++  "cases": [
++    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true},
++    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false},
++    {"id": "missing-domain", "expected": "DOMAIN_MISSING", "compatible": false},
++    {"id": "stale-contract", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false},
++    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
++    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
++    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false},
++    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false},
++    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false}
++  ]
++}
+-- 
+2.47.3
+

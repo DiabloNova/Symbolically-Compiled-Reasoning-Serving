@@ -1,0 +1,25 @@
+From 0a73023dd407999f16befafe1524f20a4b38a568 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:52 +0330
+Subject: [PATCH 11/19] Correct reference test count in instructions
+
+---
+ experiments/cross_domain_safety/README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+index 97a872d..a5a5df1 100644
+--- a/experiments/cross_domain_safety/README.md
++++ b/experiments/cross_domain_safety/README.md
+@@ -19,7 +19,7 @@ From this directory:
+ python -m unittest -v
+ ```
+ 
+-Expected outcome: 12 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++Expected outcome: 13 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
+ 
+ ## Mapping to production
+ 
+-- 
+2.47.3
+

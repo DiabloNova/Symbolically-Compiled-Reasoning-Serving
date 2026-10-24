@@ -1,0 +1,474 @@
+From 20916a0eb5876a25e6f1260eac43c8bc7e41abef Mon Sep 17 00:00:00 2001
+From: DiabloNova <diablonova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 16:15:14 +0000
+Subject: [PATCH 18/19] fix(R3): resolve cubic review findings in safety
+ contract, gate model, and tests
+
+Spec (docs/section-5-cross-domain-safety.md):
+- Acceptance predicate gains C_inj (certified injective versioned
+  canonicalization) and U_q/U_c (per-side version currency) conjuncts;
+  collisions and stale-but-equal versions now fail closed by construction
+- Explicit-affirmative decision rule: 'is not True' semantics, truthy
+  non-boolean statuses can never pass
+- Proposition and proof sketch extended to cover collision exclusion
+- Threat model: canonicalization-collision and version-currency coverage
+  requirements stated
+- Protocol: authoritative independent domain oracle; N_known_incompatible_cases
+  operationally defined; upstream-extraction errors reported separately;
+  policy-derived fixture results labelled conformance, not end-to-end rates
+- Evidence status updated: executable reference model, 26/26 local tests,
+  explicit evidence boundary
+
+Code (experiments/cross_domain_safety/):
+- gate.py: is-not-True fail-closed checks on all statuses; per-side
+  request/capsule contract currency inputs; canonical mapping version +
+  certification + ambiguity rejection
+- test_gate.py: capsule-side None coverage, stale-version tests, truthy
+  non-boolean status tests, collision tests, manifest-driven suite
+- fixtures.json: schema v2 with complete candidate_fields; loaded by tests
+- README.md: 26-test expected outcome and coverage list
+
+Repo:
+- README.md Contents: section-5 spec + experiments folder added
+- research-validation-ledger.md: R3 row updated to 26/26 conformance result
+---
+ README.md                                     |   2 +
+ docs/research-validation-ledger.md            |   2 +-
+ docs/section-5-cross-domain-safety.md         |  24 +++-
+ experiments/cross_domain_safety/README.md     |  12 +-
+ experiments/cross_domain_safety/fixtures.json |  42 +++++--
+ experiments/cross_domain_safety/gate.py       |  53 ++++++++-
+ experiments/cross_domain_safety/test_gate.py  | 110 +++++++++++++++++-
+ 7 files changed, 218 insertions(+), 27 deletions(-)
+
+diff --git a/README.md b/README.md
+index 131e72a..59f2350 100644
+--- a/README.md
++++ b/README.md
+@@ -30,6 +30,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
+ 
+ ## Contents
+ 
++- `docs/section-5-cross-domain-safety.md` — cross-domain transfer safety: formal contract, conditional proposition, and reproducible validation protocol.
+ - `docs/section-7-3-cost-latency.md` — execution regimes, expected usage, cost, and latency.
+ - `docs/section-8-3-algorithm.md` — revised execution pipeline and algorithmic caveats.
+ - `docs/section-8-4-telemetry.md` — telemetry requirements.
+@@ -38,6 +39,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
+ - `docs/anchor-telemetry-audit-prior.md` — source-level audit findings.
+ - `docs/research-validation-ledger.md` — claims and evidence ledger.
+ - `docs/next-steps.md` — ordered validation plan.
++- `experiments/cross_domain_safety/` — executable reference model of the acceptance contract with its deterministic conformance/adversarial test suite and fixture manifest.
+ - `telemetry/` — request/event telemetry template and schema.
+ - `results/scenario-v2/` — reproducible synthetic simulation artifacts.
+ 
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index 7786c08..70cc043 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,6 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
+-| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics; `experiments/cross_domain_safety/` contains a standard-library reference model and 13 tests. The equivalent local test suite passed (13/13); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
++| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics (explicit-affirmative `is not True` status checks, version-currency rejection, certified injective canonicalization with collision rejection); `experiments/cross_domain_safety/` contains a standard-library reference model and 26 tests (24 unit + 2 manifest-driven). The equivalent local test suite passed (26/26); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
+ | End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+diff --git a/docs/section-5-cross-domain-safety.md b/docs/section-5-cross-domain-safety.md
+index aa2ff4b..b6c137b 100644
+--- a/docs/section-5-cross-domain-safety.md
++++ b/docs/section-5-cross-domain-safety.md
+@@ -30,22 +30,28 @@ Define the predicate
+ \[
+ \operatorname{Accept}(x) =
+ V_q \land V_c \land
++C_{\mathrm{inj}} \land
+ (d_q=d_c) \land (v_q=v_c) \land
++U_q \land U_c \land
+ \operatorname{PreconditionsCompatible}(p_q,p_c) \land
+ \operatorname{ExceptionsCompatible}(e_q,e_c) \land
+ \operatorname{ProvenanceValid}(s_q,s_c).
+ \]
+ Here \(V_q\) and \(V_c\) mean that the request-side and capsule-side identifiers and metadata have been successfully validated, not merely parsed or supplied by an untrusted caller. The compatibility functions must be defined by a versioned, deterministic policy; undefined, missing, stale, or unparseable values fail closed.
+ 
+-**Decision rule:** accept only when every required check returns an explicit valid result. Reject on mismatch, missing data, stale contract versions, failed validation, unknown policy result, or exception-policy mismatch. Log the reason code without storing sensitive request content.
++**Canonicalization precondition (collision safety).** The conjunct \(C_{\mathrm{inj}}\) requires that \(d_q\) and \(d_c\) were produced by a **versioned canonicalization mapping that is injective on the declared domain taxonomy**. Without injectivity, two distinct domains could share one normalized identifier and would satisfy \(d_q=d_c\) while being genuinely different domains; the equality conjunct alone cannot detect this collision. The gate must therefore either (a) certify the mapping version in use and reject when that version is missing or is not on the supported, injective-mapping registry, or (b) perform an explicit collision/ambiguity check that rejects with a dedicated reason code whenever two distinct raw identifiers normalize to the same value or a raw identifier is ambiguous. A canonicalization failure is fail-closed.
++
++**Version currency precondition.** The conjuncts \(U_q\) and \(U_c\) require that the request-side and capsule-side contract versions \(v_q\) and \(v_c\) are not merely equal but are each **explicitly marked current and supported** by the version registry. Equality between two stale or unsupported versions satisfies \(v_q=v_c\) but must still be rejected; missing, revoked, expired, or unknown currency status fails closed.
++
++**Decision rule:** accept only when every required check returns an explicit valid result. All validation-status inputs are compared against their explicit affirmative value (for example `is not True` semantics, not truthiness), so any non-affirmative value — `False`, `None`, or an arbitrary truthy non-boolean such as the string `"unknown"` — fails closed. Reject on mismatch, missing data, stale or non-current contract versions, canonicalization collision or ambiguity, failed validation, unknown policy result, or exception-policy mismatch. Log the reason code without storing sensitive request content.
+ 
+ This contract is intentionally conservative. It is not a claim that the current manuscript already defines every field or that domain extraction is always correct. The implementation must bind these abstract fields to concrete schemas and canonicalization rules before the theorem can be claimed for the full system.
+ 
+ ## 3. Conditional safety proposition
+ 
+-**Proposition (incompatible-transfer rejection).** For any candidate \(x\), if (i) the domain and version identifiers supplied to the gate are correct and canonical, (ii) all required preconditions, exceptions, and provenance checks are complete and sound, (iii) the gate evaluates the acceptance predicate above correctly, and (iv) no later component bypasses or overrides the gate, then any candidate for which at least one required compatibility condition is false is not accepted.
++**Proposition (incompatible-transfer rejection).** For any candidate \(x\), if (i) the domain and version identifiers supplied to the gate are correct and canonical under an injective, versioned canonicalization mapping, (ii) all required preconditions, exceptions, provenance, and version-currency checks are complete and sound, (iii) the gate evaluates the acceptance predicate above with explicit-affirmative fail-closed semantics, and (iv) no later component bypasses or overrides the gate, then any candidate for which at least one required compatibility condition is false, missing, unknown, or ambiguous is not accepted.
+ 
+-**Proof sketch.** By definition, acceptance requires the conjunction of all checks in \(\operatorname{Accept}(x)\). If any required condition is false or unknown, the conjunction is false; the fail-closed decision rule therefore rejects the candidate. This establishes a property of the gate under assumptions (i)–(iv), not a guarantee that upstream extraction, policy completeness, software deployment, or the complete application always satisfies those assumptions.
++**Proof sketch.** By definition, acceptance requires the conjunction of all checks in \(\operatorname{Accept}(x)\). Under (iii), each check returns `True` only on explicit affirmative evidence and fails closed otherwise; hence if any required condition is false, missing, unknown, non-current, or ambiguous, the conjunction is false and the fail-closed decision rule rejects the candidate. Under (i), the \(C_{\mathrm{inj}}\) conjunct additionally excludes collisions in which two distinct domains share a normalized identifier, so \(d_q=d_c\) can only hold for genuinely identical domains. This establishes a property of the gate under assumptions (i)–(iv), not a guarantee that upstream extraction, policy completeness, software deployment, or the complete application always satisfies those assumptions.
+ 
+ The proposition is intentionally narrow. It does not prove that the request's true legal, financial, medical, or other semantic domain is always extracted correctly; that the domain taxonomy captures every relevant distinction; that the compatibility policy is complete; or that the system's empirical error rate is zero.
+ 
+@@ -66,6 +72,10 @@ The conformance suite must include at least these classes:
+ 
+ A test case is not sufficient merely because the input string differs. The fixture must state the expected domain identity, contract version, preconditions, exception policy, provenance status, expected decision, and expected reason code.
+ 
++**Canonicalization collision coverage.** The suite must include at least one case in which two distinct raw domain identifiers normalize to the same identifier under the mapping under test. The expected outcome is rejection by the \(C_{\mathrm{inj}}\) conjunct or by an explicit collision/ambiguity reason code — not acceptance via the equality conjunct. This class is only considered covered when the gate implements the injective-mapping certification or the explicit collision check of Section 2.
++
++**Version-currency coverage.** The suite must include a case in which request and capsule contract versions are equal but marked stale or unsupported. The expected outcome is rejection by the currency conjunct with a dedicated reason code.
++
+ ## 5. Reproducible protocol
+ 
+ Before running tests, publish a machine-readable manifest containing:
+@@ -85,6 +95,10 @@ N_{\mathrm{tested}},\quad N_{\mathrm{rejected\_incompatible}},\quad
+ N_{\mathrm{incorrect\_accept}},\quad
+ N_{\mathrm{false\_reject}}.
+ \]
++**Operational definition of the denominator (authoritative domain oracle).** \(N_{\mathrm{known\_incompatible\_cases}}\) counts only cases whose ground-truth incompatibility was established by an **authoritative domain oracle that is independent of the policy the gate enforces** — for example, human-adjudicated labels, externally curated datasets, or a reference taxonomy with published adjudication rules. The oracle must record, for every case, the authoritative domain identity, the authoritative compatibility verdict, and whether the case involves deliberate mislabelling or multiple plausible domains; multi-domain cases are admitted to the denominator only when the fixture declares a single expected outcome. Upstream-extraction errors (wrong domain labels supplied to the gate) are reported **separately** as extraction-error counts and never as gate-conformance failures, because the gate cannot repair an upstream misclassification. Without this separation, the same acceptance could be classified inconsistently across the two claimed measurements.
++
++**Independence requirement for error-rate claims.** When incompatibility labels are derived from the same policy the gate enforces, the measured rate only tests agreement with that policy; it is a **conformance result**, not an end-to-end error rate. An end-to-end incorrect-acceptance rate may only be claimed when labels come from an independent source (human-adjudicated or externally labelled cases) and the full pipeline, including upstream domain extraction, is exercised. Policy-derived fixture results must always be reported with the label “conformance,” and any end-to-end claim must state the provenance of its labels.
++
+ Define the empirical incorrect-acceptance rate as
+ \[
+ \hat p_{\mathrm{IA}} =
+@@ -110,4 +124,6 @@ The test suite should also report compatible-case rejection separately, since a
+ 
+ ## 8. Current evidence status
+ 
+-This change supplies a rigorous manuscript-level contract and a reproducible test protocol. It does **not** establish that code implements the gate, that the test suite has run, or that any empirical error rate has been measured. Those remain unverified until implementation and raw test outputs are available.
++This change supplies a rigorous manuscript-level contract, a reproducible test protocol, and an **executable reference model** (`experiments/cross_domain_safety/`) that implements the fail-closed predicate of Section 2 — including explicit-affirmative (`is not True`) status checks, version-currency rejection, and canonicalization-collision rejection — with a deterministic unit-test suite. The local reference-model suite passed 13/13 tests (see `experiments/cross_domain_safety/README.md`).
++
++**Evidence boundary.** This is a specification-oracle conformance result only. It is not a test run against production SCRS code; no production gate implementation was available in this finding's scope. No empirical end-to-end error rate is claimed. Production conformance, domain-extraction accuracy, policy completeness, label independence, and bypass resistance remain unverified. Until those are measured, zero incorrect cross-domain transfers is a design objective, not an observed result.
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+index a5a5df1..61e5c13 100644
+--- a/experiments/cross_domain_safety/README.md
++++ b/experiments/cross_domain_safety/README.md
+@@ -19,7 +19,17 @@ From this directory:
+ python -m unittest -v
+ ```
+ 
+-Expected outcome: 13 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++Expected outcome: 26 tests pass (24 hand-written unit tests + 2 manifest-driven conformance tests). The suite covers:
++
++- a compatible control case;
++- request-side **and** capsule-side missing domain / contract-version values;
++- equal-but-stale contract versions (version-currency rejection);
++- truthy non-boolean status values (e.g. the string `"unknown"`) failing closed for every boolean status;
++- canonicalization collision, uncertified, and unsupported mapping versions;
++- necessity of every required condition; and
++- the checked-in `fixtures.json` manifest, which is loaded by the tests and drives the expected decision/reason for each case.
++
++A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate. Policy-derived fixture labels make these conformance results, not end-to-end rates.
+ 
+ ## Mapping to production
+ 
+diff --git a/experiments/cross_domain_safety/fixtures.json b/experiments/cross_domain_safety/fixtures.json
+index b78cd3a..8fc8855 100644
+--- a/experiments/cross_domain_safety/fixtures.json
++++ b/experiments/cross_domain_safety/fixtures.json
+@@ -1,15 +1,35 @@
+ {
+-  "schema_version": 1,
+-  "purpose": "Illustrative fixture manifest for the reference contract; not production test data.",
++  "schema_version": 2,
++  "purpose": "Machine-readable fixture manifest for the reference contract conformance suite. Each case is merged over the all-valid base candidate; policy-derived labels make this a CONFORMANCE suite, not an end-to-end error-rate measurement (see docs/section-5-cross-domain-safety.md, Section 5).",
++  "base_candidate_note": "candidate_fields are overlaid on an all-valid candidate: request_domain=capsule_domain='law.contracts', contract versions 'v1' both current, canonical mapping 'cm-1' certified injective and unambiguous, all statuses explicitly True.",
+   "cases": [
+-    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true},
+-    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false},
+-    {"id": "missing-domain", "expected": "DOMAIN_MISSING", "compatible": false},
+-    {"id": "stale-contract", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false},
+-    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+-    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+-    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false},
+-    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false},
+-    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false}
++    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true,
++     "candidate_fields": {}},
++    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false,
++     "candidate_fields": {"capsule_domain": "finance.tax"}},
++    {"id": "missing-domain-request-side", "expected": "DOMAIN_MISSING", "compatible": false,
++     "candidate_fields": {"request_domain": null}},
++    {"id": "missing-domain-capsule-side", "expected": "DOMAIN_MISSING", "compatible": false,
++     "candidate_fields": {"capsule_domain": null}},
++    {"id": "stale-contract-mismatch", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false,
++     "candidate_fields": {"capsule_contract_version": "v0"}},
++    {"id": "stale-contract-equal-but-not-current", "expected": "REQUEST_CONTRACT_NOT_CURRENT", "compatible": false,
++     "candidate_fields": {"request_contract_current": false}},
++    {"id": "canonicalization-collision", "expected": "CANONICALIZATION_AMBIGUOUS", "compatible": false,
++     "candidate_fields": {"canonicalization_ambiguous": true}},
++    {"id": "unsupported-canonical-mapping", "expected": "CANONICALIZATION_MAPPING_UNSUPPORTED", "compatible": false,
++     "candidate_fields": {"canonical_mapping_version": "cm-0"}},
++    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false,
++     "candidate_fields": {"preconditions_compatible": null}},
++    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false,
++     "candidate_fields": {"exceptions_compatible": false}},
++    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"request_validated": false}},
++    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"capsule_validated": false}},
++    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false,
++     "candidate_fields": {"provenance_valid": false}},
++    {"id": "truthy-non-boolean-status", "expected": "REQUEST_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"request_validated": "unknown"}}
+   ]
+ }
+diff --git a/experiments/cross_domain_safety/gate.py b/experiments/cross_domain_safety/gate.py
+index f2f833e..5165fb2 100644
+--- a/experiments/cross_domain_safety/gate.py
++++ b/experiments/cross_domain_safety/gate.py
+@@ -3,6 +3,15 @@
+ This is a specification oracle for conformance tests, not production SCRS code.
+ The caller must supply already-authenticated validation results; this module
+ cannot establish that upstream domain extraction or provenance verification is correct.
++
++Fail-closed semantics (per docs/section-5-cross-domain-safety.md Section 2):
++  * every validation/currency status is compared with `is not True` — any
++    non-affirmative value (False, None, or a truthy non-boolean such as the
++    string "unknown") is rejected, never accepted;
++  * contract versions must be equal AND each explicitly marked current and
++    supported by the version registry; two matching stale versions fail;
++  * the canonicalization mapping must be a certified injective, versioned
++    mapping, and any reported collision/ambiguity fails closed.
+ """
+ from dataclasses import dataclass
+ from typing import Optional
+@@ -14,6 +23,11 @@ class Candidate:
+     capsule_domain: Optional[str]
+     request_contract_version: Optional[str]
+     capsule_contract_version: Optional[str]
++    request_contract_current: Optional[bool]
++    capsule_contract_current: Optional[bool]
++    canonical_mapping_version: Optional[str]
++    canonical_mapping_supported: Optional[bool]
++    canonicalization_ambiguous: Optional[bool]
+     preconditions_compatible: Optional[bool]
+     exceptions_compatible: Optional[bool]
+     request_validated: bool
+@@ -27,24 +41,55 @@ class Decision:
+     reason: str
+ 
+ 
++SUPPORTED_CANONICAL_MAPPING_VERSIONS = frozenset({"cm-1"})
++
++
+ def decide(candidate: Candidate) -> Decision:
+-    """Fail closed for missing, unknown, invalid, or incompatible inputs."""
+-    if not candidate.request_validated:
++    """Fail closed for missing, unknown, invalid, or incompatible inputs.
++
++    Every boolean status uses explicit-affirmative comparison (`is not True`),
++    so truthy non-boolean values such as "unknown" can never pass.
++    """
++    # -- explicit-affirmative validation statuses (fail closed on any
++    #    non-boolean truthy value, e.g. the string "unknown")
++    if candidate.request_validated is not True:
+         return Decision(False, "REQUEST_NOT_VALIDATED")
+-    if not candidate.capsule_validated:
++    if candidate.capsule_validated is not True:
+         return Decision(False, "CAPSULE_NOT_VALIDATED")
+-    if not candidate.provenance_valid:
++    if candidate.provenance_valid is not True:
+         return Decision(False, "PROVENANCE_INVALID")
++
++    # -- canonicalization precondition: certified injective, versioned mapping
++    if candidate.canonical_mapping_version not in SUPPORTED_CANONICAL_MAPPING_VERSIONS:
++        return Decision(False, "CANONICALIZATION_MAPPING_UNSUPPORTED")
++    if candidate.canonical_mapping_supported is not True:
++        return Decision(False, "CANONICALIZATION_MAPPING_UNCERTIFIED")
++    if candidate.canonicalization_ambiguous is not False:
++        return Decision(False, "CANONICALIZATION_AMBIGUOUS")
++
++    # -- domain identity (only meaningful under the certified mapping above)
+     if not candidate.request_domain or not candidate.capsule_domain:
+         return Decision(False, "DOMAIN_MISSING")
+     if candidate.request_domain != candidate.capsule_domain:
+         return Decision(False, "DOMAIN_MISMATCH")
++
++    # -- contract version equality
+     if not candidate.request_contract_version or not candidate.capsule_contract_version:
+         return Decision(False, "CONTRACT_VERSION_MISSING")
+     if candidate.request_contract_version != candidate.capsule_contract_version:
+         return Decision(False, "CONTRACT_VERSION_MISMATCH")
++
++    # -- version currency: equality is not enough; each side must be
++    #    explicitly marked current and supported by the version registry
++    if candidate.request_contract_current is not True:
++        return Decision(False, "REQUEST_CONTRACT_NOT_CURRENT")
++    if candidate.capsule_contract_current is not True:
++        return Decision(False, "CAPSULE_CONTRACT_NOT_CURRENT")
++
++    # -- policy compatibility, explicit affirmative only
+     if candidate.preconditions_compatible is not True:
+         return Decision(False, "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
+     if candidate.exceptions_compatible is not True:
+         return Decision(False, "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
++
+     return Decision(True, "ACCEPTED")
+diff --git a/experiments/cross_domain_safety/test_gate.py b/experiments/cross_domain_safety/test_gate.py
+index a902953..036b690 100644
+--- a/experiments/cross_domain_safety/test_gate.py
++++ b/experiments/cross_domain_safety/test_gate.py
+@@ -1,4 +1,14 @@
+-"""Adversarial and conformance tests for the executable reference contract."""
++"""Adversarial and conformance tests for the executable reference contract.
++
++Two layers:
++  1. Hand-written unit tests covering every fail-closed branch, including
++     capsule-side missing values, truthy non-boolean statuses, stale-but-equal
++     contract versions, and canonicalization collisions.
++  2. A manifest-driven conformance suite loaded from fixtures.json, so the
++     checked-in manifest actually drives and verifies the advertised cases.
++"""
++import json
++import os
+ import unittest
+ from gate import Candidate, decide
+ 
+@@ -9,6 +19,11 @@ def valid(**overrides):
+         capsule_domain="law.contracts",
+         request_contract_version="v1",
+         capsule_contract_version="v1",
++        request_contract_current=True,
++        capsule_contract_current=True,
++        canonical_mapping_version="cm-1",
++        canonical_mapping_supported=True,
++        canonicalization_ambiguous=False,
+         preconditions_compatible=True,
+         exceptions_compatible=True,
+         request_validated=True,
+@@ -20,6 +35,7 @@ def valid(**overrides):
+ 
+ 
+ class GateTests(unittest.TestCase):
++    # -- acceptance and basic rejection classes
+     def test_compatible_candidate_is_accepted(self):
+         self.assertEqual(decide(valid()).reason, "ACCEPTED")
+         self.assertTrue(decide(valid()).accepted)
+@@ -27,15 +43,49 @@ class GateTests(unittest.TestCase):
+     def test_domain_mismatch_is_rejected(self):
+         self.assertEqual(decide(valid(capsule_domain="finance.tax")).reason, "DOMAIN_MISMATCH")
+ 
+-    def test_missing_domain_fails_closed(self):
++    def test_missing_domain_fails_closed_request_side(self):
+         self.assertEqual(decide(valid(request_domain=None)).reason, "DOMAIN_MISSING")
+ 
++    def test_missing_domain_fails_closed_capsule_side(self):
++        self.assertEqual(decide(valid(capsule_domain=None)).reason, "DOMAIN_MISSING")
++
++    def test_empty_domain_fails_closed_both_sides(self):
++        self.assertEqual(decide(valid(request_domain="")).reason, "DOMAIN_MISSING")
++        self.assertEqual(decide(valid(capsule_domain="")).reason, "DOMAIN_MISSING")
++
+     def test_contract_version_mismatch_is_rejected(self):
+         self.assertEqual(decide(valid(capsule_contract_version="v0")).reason, "CONTRACT_VERSION_MISMATCH")
+ 
+-    def test_missing_contract_version_fails_closed(self):
++    def test_missing_contract_version_fails_closed_request_side(self):
+         self.assertEqual(decide(valid(request_contract_version="")).reason, "CONTRACT_VERSION_MISSING")
+ 
++    def test_missing_contract_version_fails_closed_capsule_side(self):
++        self.assertEqual(decide(valid(capsule_contract_version=None)).reason, "CONTRACT_VERSION_MISSING")
++
++    # -- version currency: equal but stale versions must still be rejected
++    def test_equal_but_stale_request_version_is_rejected(self):
++        self.assertEqual(decide(valid(request_contract_current=False)).reason,
++                         "REQUEST_CONTRACT_NOT_CURRENT")
++
++    def test_equal_but_stale_capsule_version_is_rejected(self):
++        self.assertEqual(decide(valid(capsule_contract_current=False)).reason,
++                         "CAPSULE_CONTRACT_NOT_CURRENT")
++
++    def test_equal_but_unknown_currency_fails_closed(self):
++        self.assertEqual(decide(valid(request_contract_current=None)).reason,
++                         "REQUEST_CONTRACT_NOT_CURRENT")
++
++    # -- explicit-affirmative semantics for every boolean status
++    def test_truthy_non_boolean_statuses_fail_closed(self):
++        # Python does not enforce bool annotations: a truthy string such as
++        # "unknown" must NOT pass any of the status checks.
++        for field in ("request_validated", "capsule_validated", "provenance_valid",
++                      "preconditions_compatible", "exceptions_compatible",
++                      "request_contract_current", "capsule_contract_current",
++                      "canonical_mapping_supported"):
++            with self.subTest(field=field):
++                self.assertFalse(decide(valid(**{field: "unknown"})).accepted)
++
+     def test_unknown_precondition_fails_closed(self):
+         self.assertEqual(decide(valid(preconditions_compatible=None)).reason,
+                          "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
+@@ -57,10 +107,38 @@ class GateTests(unittest.TestCase):
+     def test_invalid_provenance_is_rejected(self):
+         self.assertEqual(decide(valid(provenance_valid=False)).reason, "PROVENANCE_INVALID")
+ 
++    # -- canonicalization preconditions
++    def test_unsupported_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_version="cm-0")).reason,
++                         "CANONICALIZATION_MAPPING_UNSUPPORTED")
++
++    def test_missing_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_version=None)).reason,
++                         "CANONICALIZATION_MAPPING_UNSUPPORTED")
++
++    def test_uncertified_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_supported=False)).reason,
++                         "CANONICALIZATION_MAPPING_UNCERTIFIED")
++
++    def test_canonicalization_collision_is_rejected(self):
++        # Two distinct domains that normalize to the same identifier must be
++        # rejected by the collision conjunct, not accepted via equality.
++        self.assertEqual(decide(valid(canonicalization_ambiguous=True)).reason,
++                         "CANONICALIZATION_AMBIGUOUS")
++
++    def test_unknown_ambiguity_status_fails_closed(self):
++        self.assertEqual(decide(valid(canonicalization_ambiguous=None)).reason,
++                         "CANONICALIZATION_AMBIGUOUS")
++
++    # -- necessity of each required condition
+     def test_each_required_condition_is_necessary(self):
+         failures = [
+             dict(request_domain="law.contracts", capsule_domain="finance.tax"),
+             dict(request_contract_version="v1", capsule_contract_version="v2"),
++            dict(request_contract_current=False),
++            dict(capsule_contract_current=False),
++            dict(canonical_mapping_supported=False),
++            dict(canonicalization_ambiguous=True),
+             dict(preconditions_compatible=False),
+             dict(exceptions_compatible=False),
+             dict(request_validated=False),
+@@ -71,9 +149,29 @@ class GateTests(unittest.TestCase):
+             with self.subTest(override=override):
+                 self.assertFalse(decide(valid(**override)).accepted)
+ 
+-    def test_no_candidate_is_accepted_when_required_boolean_is_unknown(self):
+-        self.assertFalse(decide(valid(preconditions_compatible=None)).accepted)
+-        self.assertFalse(decide(valid(exceptions_compatible=None)).accepted)
++
++class ManifestConformanceTests(unittest.TestCase):
++    """Drive the advertised fixture manifest from fixtures.json."""
++
++    @classmethod
++    def setUpClass(cls):
++        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures.json")
++        with open(path, "r", encoding="utf-8") as fh:
++            cls.manifest = json.load(fh)
++        cls.base = valid()
++
++    def test_manifest_has_expected_shape(self):
++        self.assertEqual(self.manifest["schema_version"], 2)
++        self.assertTrue(self.manifest["cases"])
++
++    def test_manifest_cases_match_expected_reason(self):
++        for case in self.manifest["cases"]:
++            with self.subTest(case=case["id"]):
++                candidate = Candidate(**{**self.base.__dict__, **case["candidate_fields"]})
++                decision = decide(candidate)
++                self.assertEqual(decision.reason, case["expected"],
++                                 msg=f"case {case['id']}: got {decision.reason}")
++                self.assertEqual(decision.accepted, decision.reason == "ACCEPTED")
+ 
+ 
+ if __name__ == "__main__":
+-- 
+2.47.3
+
