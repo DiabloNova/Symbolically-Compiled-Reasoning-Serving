@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "manifest_id": "legalbenchrag",
+  "display_name": "LegalBench-RAG",
+  "canonical_repository": "https://github.com/ZeroEntropy-AI/legalbenchrag",
+  "paper": "https://arxiv.org/abs/2408.10343",
+  "status": "blocked-pending-source-specific-data-licence-review",
+  "code_license": {
+    "value": "MIT",
+    "evidence_url": "https://github.com/ZeroEntropy-AI/legalbenchrag/blob/master/LICENSE",
+    "scope": "upstream code only; this is not evidence that every item in the linked benchmark archive may be redistributed under MIT"
+  },
+  "data_bundle": {
+    "url_location": "linked from the upstream README",
+    "single_data_license_file_found": false,
+    "ingestion_allowed": false,
+    "reason": "The upstream README directs users to check the usage policies of ContractNLI, CUAD, MAUD, and PrivacyQA. No single data licence for the whole downloaded bundle was verified."
+  },
+  "source_datasets_requiring_review": [
+    {
+      "name": "ContractNLI",
+      "paper": "https://arxiv.org/abs/2110.01799",
+      "review_status": "pending"
+    },
+    {
+      "name": "CUAD",
+      "paper": "https://arxiv.org/abs/2103.06268",
+      "review_status": "pending"
+    },
+    {
+      "name": "MAUD",
+      "paper": "https://arxiv.org/abs/2301.00876",
+      "review_status": "pending"
+    },
+    {
+      "name": "PrivacyQA",
+      "paper": "https://arxiv.org/abs/1911.00841",
+      "review_status": "pending"
+    }
+  ],
+  "permitted_work_now": [
+    "Cite and study the paper and upstream source code within their respective terms.",
+    "Record metadata and licence review progress.",
+    "Do not download the corpus into this repository or redistribute the benchmark bundle until every included source is reviewed."
+  ],
+  "last_reviewed": "2026-10-23"
+}

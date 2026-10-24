@@ -1,0 +1,25 @@
+From d75229447479cd527d3feb7aaa005ec5c60eeca7 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:40:21 +0330
+Subject: [PATCH 12/19] Record reference-model test result and evidence
+ boundary
+
+---
+ docs/research-validation-ledger.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index fbb972c..7786c08 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,6 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
+-| Cross-domain gate rejection property | Conditional specification drafted; implementation conformance unverified | `docs/section-5-cross-domain-safety.md` defines explicit assumptions, fail-closed semantics, and a test protocol; no code/test output is claimed | Implement or map the gate to reference code; run the published conformance and adversarial suite; report counts and confidence interval |
++| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics; `experiments/cross_domain_safety/` contains a standard-library reference model and 13 tests. The equivalent local test suite passed (13/13); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
+ | End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+-- 
+2.47.3
+

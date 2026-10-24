@@ -1,0 +1,29 @@
+From bc3b3754ba22c27ec4f358f667f0c52a5609795c Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:28:54 +0330
+Subject: [PATCH 04/19] Research P0 R2: update remediation next steps
+
+---
+ docs/next-steps.md | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/docs/next-steps.md b/docs/next-steps.md
+index 691d8e5..e21fd8d 100644
+--- a/docs/next-steps.md
++++ b/docs/next-steps.md
+@@ -1,9 +1,9 @@
+ # Next steps, ordered by evidence dependency
+ 
+ 1. **Obtain source implementation:** provide the reference implementation repository/commit or source files for Anchor, interrupt handling, retries, batching, and fallback.
+-2. **Audit transport semantics:** trace a logical interrupt through the call stack and determine how it maps to HTTP attempts and billed generations.
+-3. **Fix algorithm counters:** correct `n_int` and define every reported metric precisely.
+-4. **Instrument telemetry:** implement the request-level template plus event-level records; redact sensitive content.
++2. **Instrument transport semantics:** apply the Section 8.3 counter contract at the actual transport boundary; distinguish logical interrupts, attempts, provider-confirmed generations, and returned/billed tokens.
++3. **Validate counter behavior:** test the cases specified in Section 8.3, including no interrupt, multiple interrupts, retries, unknown timeout outcomes, miss fallback, and halt followed by fallback.
++4. **Instrument telemetry:** implement the request-level and event-level records in Section 8.4; redact sensitive content and preserve unknown values rather than coercing them to zero.
+ 5. **Validate the equations:** test regime probabilities and expected token/cost formulas, retaining separate bailout and miss means when needed.
+ 6. **Reconcile Table 2 / Figure 3:** recover exact data, price assumptions, and figure source; resolve the Unified SCRS output-token inconsistency.
+ 7. **Re-run latency analysis:** use measured traces where available. Keep synthetic results clearly separated and report all simulation assumptions.
+-- 
+2.47.3
+

@@ -1,0 +1,53 @@
+From 79d7a0d5592b751acf494a235f6361918ff2ec57 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:41 +0330
+Subject: [PATCH 09/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/README.md | 33 +++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/README.md
+
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+new file mode 100644
+index 0000000..97a872d
+--- /dev/null
++++ b/experiments/cross_domain_safety/README.md
+@@ -0,0 +1,33 @@
++# Cross-domain safety reference tests
++
++## Purpose and limitation
++
++This folder provides an executable, standard-library Python reference model for the **abstract acceptance contract** in `docs/section-5-cross-domain-safety.md`. It makes the fail-closed rule concrete and supplies deterministic conformance/adversarial tests.
++
++It is **not** the SCRS production implementation and does not validate real domain extraction, canonicalization, compatibility-policy completeness, signatures, or bypass resistance in a deployed pipeline. The booleans `request_validated`, `capsule_validated`, and `provenance_valid` are trusted inputs to this reference model; production code must connect them to real verification mechanisms.
++
++## Requirements
++
++- Python 3.10 or newer
++- No third-party dependencies
++
++## Run
++
++From this directory:
++
++```sh
++python -m unittest -v
++```
++
++Expected outcome: 12 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++
++## Mapping to production
++
++Before claiming implementation conformance, map each field to the production schema and validation function, then run equivalent tests against the actual gate and record:
++- source commit and dependency/runtime versions;
++- fixture manifest and expected decision/reason;
++- raw per-case outputs;
++- counts of incompatible cases, incorrect acceptances, and compatible cases incorrectly rejected;
++- an appropriate binomial confidence interval.
++
++Do not report an empirical zero error rate from this reference suite.
+-- 
+2.47.3
+

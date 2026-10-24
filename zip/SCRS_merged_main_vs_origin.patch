@@ -1,0 +1,1698 @@
+From e460aba67c5cd69b0de84f542f19fddb135f22c8 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 18:30:11 +0330
+Subject: [PATCH 01/19] Research P0 R2: define interrupt and Oracle counters
+
+---
+ docs/section-8-3-algorithm.md | 94 +++++++++++++++++++++++++++++++----
+ 1 file changed, 84 insertions(+), 10 deletions(-)
+
+diff --git a/docs/section-8-3-algorithm.md b/docs/section-8-3-algorithm.md
+index bea2682..a981de3 100644
+--- a/docs/section-8-3-algorithm.md
++++ b/docs/section-8-3-algorithm.md
+@@ -1,16 +1,90 @@
+ # Replacement draft — Section 8.3: Execution pipeline
+ 
+-The request path has four conceptual stages: (1) evaluate admission and retrieve a compatible compiled reasoning artifact; (2) execute the local reasoning path while recording the active-generation interval; (3) if a halt/interrupt condition fires, record the event and request Anchor support; and (4) either resume the local path or enter the declared Oracle fallback path.
++The request path has four conceptual stages: (1) evaluate admission and retrieve a compatible compiled reasoning artifact; (2) execute the deterministic local reasoning path; (3) render the answer locally, recording each logical Anchor interrupt and its remote work; and (4) either complete the fast path or enter full Oracle fallback after a miss or halt. The algorithm must not infer transport-level events from a logical method call.
+ 
+-Implementation and evaluation must distinguish the following counters:
+-- `anchor_interrupt_count`: logical interrupt events raised by the local runtime;
+-- `anchor_api_attempt_count`: transport attempts, including retries;
+-- `anchor_provider_generation_count`: provider-billed generations, where observable;
+-- `anchor_tokens_total`: returned or billed Anchor tokens, with the token definition stated;
+-- `oracle_fallback_count`: requests that invoke full reasoning after bailout or miss.
++## Counter contract
+ 
+-The supplied Algorithm 1 initializes `n_int = 0` but does not increment it on interrupt. Consequently, `oracleCallsAvoided = (n_int == 0)` is always true in the pseudocode as provided. Increment the counter at the event boundary or compute the metric from independently recorded call events.
++The following counters have distinct units and scopes. They are request-scoped and initialized to zero before the first stage:
+ 
+-The pseudocode's single `Oracle.generateAnchors(...)` invocation per interrupt establishes one logical method invocation in the algorithm. It does not establish exactly one HTTP/API round trip: retries, batching, caching, and transport-layer behavior must be verified in the implementation and traces.
++- `anchor_interrupt_count`: number of logical interrupt events raised by the local runtime. Increment exactly once when an interrupt condition is accepted and the runtime commits to requesting Anchor support. Do not increment for every token considered or every retry.
++- `anchor_transport_attempt_count`: number of transport attempts initiated for Anchor requests, including retries. Increment at the transport boundary for each attempt.
++- `anchor_provider_generation_count`: number of provider generations confirmed by provider response or billing evidence. A timed-out attempt with unknown provider outcome must be recorded as unknown, not silently counted as zero.
++- `anchor_tokens_returned`: tokens present in successful Anchor responses, using the declared tokenizer and counting rule.
++- `anchor_tokens_billed`: tokens the provider reports as billable. Keep this separate from returned tokens because retries, failed responses, minimum billing, or provider accounting may make them differ.
++- `full_oracle_fallback_count`: number of full-reasoning fallback operations initiated for the request. A fallback is caused by a miss or a halted execution; it is not an Anchor interrupt.
++- `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: transport attempts and confirmed provider generations for full-reasoning fallback, tracked separately from Anchor support.
+ 
+-A reproducible evaluation should record start/end timestamps for local generation, halt decision, queueing, Oracle time-to-first-token, per-token generation time, Anchor response, and fallback. Do not infer these intervals from total latency alone.
++A logical interrupt, transport attempt, provider generation, and token are different units. Their counts are not assumed to be equal. The algorithm can define and increment logical events exactly; actual provider generations and billed tokens require provider-side evidence and must be marked unknown when that evidence is unavailable.
++
++## Corrected Algorithm 1 counter semantics
++
++```text
++Initialize all request counters to 0.
++Initialize terminal_regime = UNSET.
++
++On an admitted, validated candidate:
++    Execute deterministic reasoning.
++    If execution halts:
++        terminal_regime = FALLBACK
++        increment full_oracle_fallback_count when full fallback is initiated
++        invoke full Oracle fallback through the instrumented client
++        record each transport attempt, confirmed generation, token result,
++        and unknown provider outcome separately
++        emit request and event telemetry
++        return fallback answer and telemetry
++
++    Otherwise:
++        while local rendering has not reached EOS:
++            obtain the next local token and compute the interrupt predicate
++            if interrupt predicate is true and cooldown permits:
++                increment anchor_interrupt_count exactly once
++                call the instrumented Anchor client
++                for each actual transport attempt:
++                    increment anchor_transport_attempt_count
++                    emit an attempt event with outcome and retry metadata
++                on confirmed provider response:
++                    record provider generation evidence, returned tokens,
++                    and provider-billed tokens separately
++                    append returned Anchor text to the answer
++                on error:
++                    record error and whether provider outcome is known;
++                    apply the declared retry/fallback policy
++                update cooldown state
++            else:
++                append the local token
++
++        terminal_regime = FAST_PATH
++        emit request and event telemetry
++        return answer and telemetry
++
++On retrieval/admission miss:
++    terminal_regime = FALLBACK
++    increment full_oracle_fallback_count when full fallback is initiated
++    invoke the instrumented full Oracle client and record attempts,
++    confirmed generations, token counts, and unknown outcomes
++    emit request and event telemetry
++    return fallback answer and telemetry
++```
++
++This is a counter contract, not a claim that a reference implementation or production trace already exists. The client instrumentation must be implemented at the actual transport boundary to count retries accurately.
++
++## Replacement for `oracleCallsAvoided`
++
++Remove `oracleCallsAvoided = (n_int == 0)`. It is invalid because the source pseudocode never increments `n_int`, and because zero Anchor interrupts does not rule out full Oracle fallback. Also, Anchor support itself may call the Oracle, so the unqualified phrase “Oracle calls avoided” is ambiguous.
++
++For requests that terminate successfully on the fast path, report `full_oracle_fallback_avoided = true` only when `full_oracle_fallback_count == 0`. Report the actual Anchor transport attempts and provider generations separately. For fallback requests, set `full_oracle_fallback_avoided = false`. If the terminal regime or fallback outcome is unknown, report the metric as unknown rather than coercing it to a boolean. This metric means only that full-reasoning fallback was avoided; it does not mean that all Oracle traffic was avoided.
++
++## Required validation cases
++
++1. Fast path with no interrupts: interrupt and Anchor-attempt counts are zero; full fallback count is zero; fallback avoided is true.
++2. Fast path with one interrupt and one successful attempt: one logical interrupt, one transport attempt, and provider/token counts taken from the response and billing evidence.
++3. Fast path with multiple interrupts: each accepted interrupt increments the logical counter once; attempts and tokens accumulate independently.
++4. Retry after transport failure: one logical interrupt but multiple transport attempts; provider generation count follows evidence, not attempt count.
++5. Timeout with unknown provider outcome: attempt is counted; provider generation/billing is unknown until evidence resolves it.
++6. Miss without any Anchor interrupt: full fallback is counted and fallback-avoided is false.
++7. Halt after one or more Anchor events: Anchor counters retain their accumulated values and full fallback is also counted.
++8. Empty or failed Anchor response: interrupt and attempt events remain visible; returned and billed token counts follow observed evidence and may differ.
++9. Duplicate delivery or callback: event identifiers prevent a single logical event from being counted twice.
++10. All request paths: every emitted counter has a documented unit, scope, and source of evidence; no unknown value is silently represented as zero.
++
++The pseudocode in the original manuscript used `n_int` for an interrupt counter but did not increment it. The replacement uses explicit names and a documented event boundary to remove that ambiguity.
+-- 
+2.47.3
+
+
+From 724de9df6537365e02266548baa5410911fa1732 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 18:30:15 +0330
+Subject: [PATCH 02/19] Research P0 R2: align telemetry with counter contract
+
+---
+ docs/section-8-4-telemetry.md | 32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
+
+diff --git a/docs/section-8-4-telemetry.md b/docs/section-8-4-telemetry.md
+index 4dd55b3..1483154 100644
+--- a/docs/section-8-4-telemetry.md
++++ b/docs/section-8-4-telemetry.md
+@@ -1,9 +1,33 @@
+ # Replacement draft — Section 8.4: Telemetry and reproducibility
+ 
+-Collect a request-level record and a separate event-level record for each Oracle/Anchor transport attempt. The request record should identify the configuration and deployment version, anonymized request identifier, terminal regime, end-to-end start/end timestamps, token counts, costs, and terminal status. Event-level records should include event type, parent event, attempt number, provider request identifier (redacted or pseudonymized), queue interval, TTFT, TPOT, input/output tokens, retry/batch status, model, region, and price tier.
++Collect a request-level record and a separate event-level record for each logical interrupt, transport attempt, provider response, and full-reasoning fallback operation. A request record identifies the anonymized request, configuration and software versions, terminal regime, request start/end times, final status, and the summary counters defined in Section 8.3. Event records must link to the parent request and, where applicable, to the logical interrupt that caused an attempt.
+ 
+-For the local runtime, capture generation start/end, rendering start/end, halt-decision timestamp, partial tokens at halt, and fallback start/end. Use monotonic timestamps for durations and UTC timestamps for correlation. Keep logical interrupt events, transport attempts, billed generations, and token totals separate.
++## Counter definitions and evidence
+ 
+-Do not log API keys, raw prompts, full responses, or unredacted user identifiers. Document missing telemetry, sampling, clock assumptions, provider-side visibility limits, and software versions. A CSV template and JSON field schema are provided under `telemetry/`.
++Keep these quantities separate:
+ 
+-End-to-end latency alone cannot reconstruct queue wait, TTFT, TPOT, Anchor call counts, or overlap between local generation and remote calls. P50/P95 claims must be computed from event-linked request traces or clearly labelled simulation output.
++- `anchor_interrupt_count`: logical interrupt events accepted by the local runtime.
++- `anchor_transport_attempt_count`: actual Anchor transport attempts, including retries.
++- `anchor_provider_generation_count`: provider generations confirmed by response or billing evidence.
++- `anchor_tokens_returned`: tokens returned by successful Anchor responses.
++- `anchor_tokens_billed`: tokens reported as billable by the provider.
++- `full_oracle_fallback_count`: full-reasoning fallback operations initiated after a miss or halt.
++- `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: full-fallback attempts and confirmed generations, separate from Anchor activity.
++
++For each count, document its unit, request scope, increment point, and evidence source. A transport timeout does not establish whether the provider generated or billed a response. Record the attempt as observed and the provider outcome as unknown until reconciled; do not treat missing provider telemetry as zero. If the provider does not expose generation-level billing, label the metric unavailable and state the limitation.
++
++## Event record
++
++At minimum, event records should include: event ID; parent request ID; causal interrupt ID where applicable; event type; monotonic start/end times; UTC correlation timestamp; attempt number; retry/batch/cache status; provider request ID in redacted or pseudonymized form; outcome/error category; model and region; input/output token values and whether they are returned or billed; cost basis and price tier; and an explicit evidence status such as `observed`, `provider-confirmed`, `estimated`, or `unknown`.
++
++For local execution, capture candidate admission, gate result, deterministic-execution outcome, rendering start/end, interrupt predicate and accepted interrupt timestamp, partial tokens at halt, fallback start/end, and terminal regime. Use monotonic timestamps for duration calculations and UTC timestamps for cross-system correlation. State how duplicate events are deduplicated and how partial or missing records affect aggregates.
++
++## Derived metrics
++
++Do not emit the original `oracleCallsAvoided = (n_int == 0)` metric. Report `full_oracle_fallback_avoided` only as a request-level outcome derived from a known terminal regime and a zero `full_oracle_fallback_count`. This means full reasoning fallback was avoided; it does not mean that Anchor requests or all Oracle traffic were avoided. If fallback status is unknown, the derived value is unknown.
++
++Request-level and event-level records must be joined before calculating counts, token totals, cost, or latency distributions. Report denominators and missing-data rates. Do not equate logical interrupts, transport attempts, provider generations, and token totals, and do not infer provider billing from client-side attempts alone.
++
++## Privacy and latency validity
++
++Do not log API keys, raw prompts, full responses, or unredacted user identifiers. Document sampling, clock assumptions, provider-side visibility limits, missing telemetry, software versions, and the exact aggregation procedure. End-to-end latency alone cannot reconstruct queue wait, TTFT, TPOT, retries, Anchor calls, or overlap between local generation and remote calls. P50/P95 claims must be computed from event-linked request traces or clearly labelled simulation output.
+-- 
+2.47.3
+
+
+From f3ca968cd94d6168bc1ad5cd15cc19a58e4c184a Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Thu, 22 Oct 2026 18:30:18 +0330
+Subject: [PATCH 03/19] Research P0 R2: record corrected counter semantics
+
+---
+ docs/research-validation-ledger.md | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index bfd24bc..fcfefe0 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -5,8 +5,10 @@
+ | Regime probability decomposition | Analytical | Conditional halt probability is defined after admission | Preserve definition and test probabilities sum to one |
+ | Simplified expected Oracle output formula | Conditional | Requires equal conditional full-Oracle output means for bailout and miss | Use separate conditional means unless justified |
+ | Unified SCRS output-token value in Table 2 | Inconsistent under stated simplified assumptions | Baseline 2,380; alpha_eff 0.62 implies fallback contribution 904.4 before positive Anchor output; reported 894 | Reconcile source values or correct table/equation |
+-| Anchor call count | Unverified at transport layer | Pseudocode has one method call per interrupt; implementation transport not inspected | Inspect reference implementation and event traces |
+-| Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
++| Anchor call count | Unverified at transport layer | Logical interrupt, transport attempts, provider generations, and billed tokens are distinct; transport implementation and traces are not supplied | Instrument actual transport boundary and reconcile provider evidence |
++| Algorithm 1 interrupt counter | Corrected in replacement draft | Original `n_int` was initialized but never incremented; `oracleCallsAvoided` incorrectly depended on it | Use Section 8.3 counter contract; validate all required scenarios before claiming implementation correctness |
++| Full Oracle fallback avoidance | Defined, not measured | A fast-path completion can avoid full-reasoning fallback while still making Anchor/Oracle calls | Report only from known terminal regime and fallback events; never describe as zero total Oracle traffic |
++| Telemetry schema | Specification updated; implementation unverified | Replacement drafts define event/request fields and missing-evidence handling | Implement instrumentation and validate against real traces before making measured claims |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+-- 
+2.47.3
+
+
+From bc3b3754ba22c27ec4f358f667f0c52a5609795c Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:28:54 +0330
+Subject: [PATCH 04/19] Research P0 R2: update remediation next steps
+
+---
+ docs/next-steps.md | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/docs/next-steps.md b/docs/next-steps.md
+index 691d8e5..e21fd8d 100644
+--- a/docs/next-steps.md
++++ b/docs/next-steps.md
+@@ -1,9 +1,9 @@
+ # Next steps, ordered by evidence dependency
+ 
+ 1. **Obtain source implementation:** provide the reference implementation repository/commit or source files for Anchor, interrupt handling, retries, batching, and fallback.
+-2. **Audit transport semantics:** trace a logical interrupt through the call stack and determine how it maps to HTTP attempts and billed generations.
+-3. **Fix algorithm counters:** correct `n_int` and define every reported metric precisely.
+-4. **Instrument telemetry:** implement the request-level template plus event-level records; redact sensitive content.
++2. **Instrument transport semantics:** apply the Section 8.3 counter contract at the actual transport boundary; distinguish logical interrupts, attempts, provider-confirmed generations, and returned/billed tokens.
++3. **Validate counter behavior:** test the cases specified in Section 8.3, including no interrupt, multiple interrupts, retries, unknown timeout outcomes, miss fallback, and halt followed by fallback.
++4. **Instrument telemetry:** implement the request-level and event-level records in Section 8.4; redact sensitive content and preserve unknown values rather than coercing them to zero.
+ 5. **Validate the equations:** test regime probabilities and expected token/cost formulas, retaining separate bailout and miss means when needed.
+ 6. **Reconcile Table 2 / Figure 3:** recover exact data, price assumptions, and figure source; resolve the Unified SCRS output-token inconsistency.
+ 7. **Re-run latency analysis:** use measured traces where available. Keep synthetic results clearly separated and report all simulation assumptions.
+-- 
+2.47.3
+
+
+From c11fa13967448a2dc24f3a2c71038b93e8d8057d Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:34:07 +0330
+Subject: [PATCH 05/19] Research P0 R3: specify conditional cross-domain safety
+ claim
+
+---
+ docs/section-5-cross-domain-safety.md | 113 ++++++++++++++++++++++++++
+ 1 file changed, 113 insertions(+)
+ create mode 100644 docs/section-5-cross-domain-safety.md
+
+diff --git a/docs/section-5-cross-domain-safety.md b/docs/section-5-cross-domain-safety.md
+new file mode 100644
+index 0000000..1fa9683
+--- /dev/null
++++ b/docs/section-5-cross-domain-safety.md
+@@ -0,0 +1,113 @@
++# Finding 3 — Cross-domain transfer safety: formal contract and reproducible validation protocol
++
++**Scope.** This document addresses only the audit finding that the manuscript's claim of structurally impossible cross-domain transfer / zero incorrect-transfer rate exceeds the evidence currently documented. It is a replacement specification for manuscript sections 5.2–5.3 and the corresponding evaluation protocol; it does not claim that a reference implementation or experiments already exist.
++
++## 1. Corrected claim and terminology
++
++The manuscript must distinguish three statements:
++
++1. **Specification-level rejection property (formal, conditional):** a candidate capsule is rejected when its validated domain identity, compatibility version, required preconditions, or exception policy fails the acceptance predicate.
++2. **Implementation conformance (testable):** a particular implementation rejects every test input that violates that predicate and accepts only inputs that satisfy it, subject to the completeness of the test suite.
++3. **End-to-end empirical error rate (measured):** the observed rate of incorrect cross-domain acceptance over a specified dataset and protocol.
++
++The first statement does not entail the second or third. A zero observed error count in a finite test set is not proof of a zero population error rate. Until implementation and tests exist, use “designed to reject incompatible cross-domain transfers under the stated assumptions,” not “structurally impossible” or “zero error rate.”
++
++## 2. Acceptance contract
++
++Let a candidate transfer be represented by
++\[
++x=(d_q,v_q,d_c,v_c,p_q,p_c,e_q,e_c,s_q,s_c),
++\]
++where:
++
++- \(d_q,d_c\): canonical domain identifiers for the request and capsule;
++- \(v_q,v_c\): versions of the domain/compatibility contract;
++- \(p_q,p_c\): required preconditions and capsule preconditions;
++- \(e_q,e_c\): exception-policy identifiers and versions;
++- \(s_q,s_c\): provenance/status metadata, including validation status.
++
++Define the predicate
++\[
++\operatorname{Accept}(x) =
++V_q \land V_c \land
++(d_q=d_c) \land (v_q=v_c) \land
++\operatorname{PreconditionsCompatible}(p_q,p_c) \land
++\operatorname{ExceptionsCompatible}(e_q,e_c) \land
++\operatorname{ProvenanceValid}(s_q,s_c).
++\]
++Here \(V_q\) and \(V_c\) mean that the request-side and capsule-side identifiers and metadata have been successfully validated, not merely parsed or supplied by an untrusted caller. The compatibility functions must be defined by a versioned, deterministic policy; undefined, missing, stale, or unparseable values fail closed.
++
++**Decision rule:** accept only when every required check returns an explicit valid result. Reject on mismatch, missing data, stale contract versions, failed validation, unknown policy result, or exception-policy mismatch. Log the reason code without storing sensitive request content.
++
++This contract is intentionally conservative. It is not a claim that the current manuscript already defines every field or that domain extraction is always correct. The implementation must bind these abstract fields to concrete schemas and canonicalization rules before the theorem can be claimed for the full system.
++
++## 3. Conditional safety proposition
++
++**Proposition (incompatible-transfer rejection).** For any candidate \(x\), if (i) the domain and version identifiers supplied to the gate are correct and canonical, (ii) all required preconditions, exceptions, and provenance checks are complete and sound, (iii) the gate evaluates the acceptance predicate above correctly, and (iv) no later component bypasses or overrides the gate, then any candidate for which at least one required compatibility condition is false is not accepted.
++
++**Proof sketch.** By definition, acceptance requires the conjunction of all checks in \(\operatorname{Accept}(x)\). If any required condition is false or unknown, the conjunction is false; the fail-closed decision rule therefore rejects the candidate. This establishes a property of the gate under assumptions (i)–(iv), not a guarantee that upstream extraction, policy completeness, software deployment, or the complete application always satisfies those assumptions.
++
++The proposition is intentionally narrow. It does not prove that the request's true legal, financial, medical, or other semantic domain is always extracted correctly; that the domain taxonomy captures every relevant distinction; that the compatibility policy is complete; or that the system's empirical error rate is zero.
++
++## 4. Required threat and failure model
++
++The conformance suite must include at least these classes:
++
++- **Domain mismatch:** same-looking capsule with a different canonical domain identifier.
++- **Version mismatch:** compatible-looking identifiers but stale or unsupported contract versions.
++- **Missing/unknown metadata:** absent domain, precondition, exception, provenance, or validation status.
++- **Extraction error:** a deliberately wrong request-domain label supplied to the gate, to demonstrate that the gate cannot repair an upstream misclassification.
++- **Ambiguity / multiple domains:** request contains more than one plausible domain or a cross-domain dependency; the expected outcome must be explicitly defined (reject or route to a separately specified composition path).
++- **Exception mismatch:** exception policy absent, stale, or inconsistent.
++- **Canonicalization collision:** two distinct domains map to the same normalized identifier, or visually similar identifiers differ after canonicalization.
++- **Tampering / provenance failure:** altered capsule metadata, invalid signature/hash, or untrusted validation status.
++- **Bypass / ordering error:** execution path attempts to consume the capsule before or without the gate.
++- **Unknown runtime result:** validation service unavailable, timeout, or an unrecognized policy version; expected result is fail-closed, not implicit acceptance.
++
++A test case is not sufficient merely because the input string differs. The fixture must state the expected domain identity, contract version, preconditions, exception policy, provenance status, expected decision, and expected reason code.
++
++## 5. Reproducible protocol
++
++Before running tests, publish a machine-readable manifest containing:
++
++- source commit and implementation version;
++- domain taxonomy and compatibility-policy version/hash;
++- canonicalization rules;
++- fixture-generation script and fixed seed, where randomness is used;
++- test-case counts by failure class;
++- expected outcomes and reason codes;
++- test command, runtime/dependency versions, and environment;
++- raw per-case results and a summary script.
++
++Report separate quantities:
++\[
++N_{\mathrm{tested}},\quad N_{\mathrm{rejected\_incompatible}},\quad
++N_{\mathrm{incorrect\_accept}},\quad
++N_{\mathrm{false\_reject}}.
++\]
++Define the empirical incorrect-acceptance rate as
++\[
++\hat p_{\mathrm{IA}} =
++\frac{N_{\mathrm{incorrect\_accept}}}
++{N_{\mathrm{known\_incompatible\_cases}}}.
++\]
++Do not use a denominator that mixes compatible and incompatible cases. Report the numerator, denominator, dataset construction, and an appropriate binomial confidence interval. If zero incorrect acceptances are observed, report “0 observed in n tested incompatible cases” with the interval; do not report a proven population rate of zero.
++
++The test suite should also report compatible-case rejection separately, since a gate that rejects everything would trivially avoid incorrect acceptance but would not be useful.
++
++## 6. Manuscript replacement text
++
++> **Cross-domain transfer safety.** SCRS specifies a fail-closed compatibility gate for reuse of a reasoning capsule. A capsule is eligible for reuse only when validated domain identifiers and contract versions match and the required preconditions, exception policy, and provenance checks pass. Missing, stale, unknown, or inconsistent metadata causes rejection. Under the assumptions that domain identifiers are correctly extracted and canonicalized, the compatibility contract is complete, the gate conforms to its specification, and no execution path bypasses it, an incompatible candidate cannot be accepted by the gate. This is a conditional property of the specified decision procedure; it does not establish that upstream domain extraction is error-free or that the end-to-end system has a zero empirical error rate. The latter requires a separately reported conformance and adversarial evaluation. Until such evaluation is run, zero incorrect transfers should be treated as a design objective, not an observed result.
++
++## 7. Acceptance criteria for this finding
++
++- [ ] Manuscript language no longer states or implies unconditional structural impossibility or a measured zero rate without evidence.
++- [ ] The gate's inputs, canonicalization, compatibility predicate, unknown-state behavior, and fail-closed rule are defined.
++- [ ] The proposition states its assumptions and does not extend the gate-level result to upstream extraction or the full system.
++- [ ] A conformance protocol covers the threat classes above and includes compatible cases as well as incompatible cases.
++- [ ] Results are reported with explicit numerator/denominator and uncertainty; unrun tests are labelled pending.
++- [ ] Claim/evidence ledger marks the guarantee as **conditional specification**, and end-to-end performance as **not yet measured**.
++
++## 8. Current evidence status
++
++This change supplies a rigorous manuscript-level contract and a reproducible test protocol. It does **not** establish that code implements the gate, that the test suite has run, or that any empirical error rate has been measured. Those remain unverified until implementation and raw test outputs are available.
+-- 
+2.47.3
+
+
+From b5322ad75904e97cb6c32388a1333baa8bcc6839 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:34:19 +0330
+Subject: [PATCH 06/19] Track conditional safety claim and unmeasured error
+ rate
+
+---
+ docs/research-validation-ledger.md | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index bfd24bc..fbb972c 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,4 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
++| Cross-domain gate rejection property | Conditional specification drafted; implementation conformance unverified | `docs/section-5-cross-domain-safety.md` defines explicit assumptions, fail-closed semantics, and a test protocol; no code/test output is claimed | Implement or map the gate to reference code; run the published conformance and adversarial suite; report counts and confidence interval |
++| End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+-- 
+2.47.3
+
+
+From a5ba1ad6b2fef6bb19511e657213556a52b6c7c4 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:35 +0330
+Subject: [PATCH 07/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/gate.py | 50 +++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/gate.py
+
+diff --git a/experiments/cross_domain_safety/gate.py b/experiments/cross_domain_safety/gate.py
+new file mode 100644
+index 0000000..f2f833e
+--- /dev/null
++++ b/experiments/cross_domain_safety/gate.py
+@@ -0,0 +1,50 @@
++"""Executable reference model for the SCRS cross-domain acceptance contract.
++
++This is a specification oracle for conformance tests, not production SCRS code.
++The caller must supply already-authenticated validation results; this module
++cannot establish that upstream domain extraction or provenance verification is correct.
++"""
++from dataclasses import dataclass
++from typing import Optional
++
++
++@dataclass(frozen=True)
++class Candidate:
++    request_domain: Optional[str]
++    capsule_domain: Optional[str]
++    request_contract_version: Optional[str]
++    capsule_contract_version: Optional[str]
++    preconditions_compatible: Optional[bool]
++    exceptions_compatible: Optional[bool]
++    request_validated: bool
++    capsule_validated: bool
++    provenance_valid: bool
++
++
++@dataclass(frozen=True)
++class Decision:
++    accepted: bool
++    reason: str
++
++
++def decide(candidate: Candidate) -> Decision:
++    """Fail closed for missing, unknown, invalid, or incompatible inputs."""
++    if not candidate.request_validated:
++        return Decision(False, "REQUEST_NOT_VALIDATED")
++    if not candidate.capsule_validated:
++        return Decision(False, "CAPSULE_NOT_VALIDATED")
++    if not candidate.provenance_valid:
++        return Decision(False, "PROVENANCE_INVALID")
++    if not candidate.request_domain or not candidate.capsule_domain:
++        return Decision(False, "DOMAIN_MISSING")
++    if candidate.request_domain != candidate.capsule_domain:
++        return Decision(False, "DOMAIN_MISMATCH")
++    if not candidate.request_contract_version or not candidate.capsule_contract_version:
++        return Decision(False, "CONTRACT_VERSION_MISSING")
++    if candidate.request_contract_version != candidate.capsule_contract_version:
++        return Decision(False, "CONTRACT_VERSION_MISMATCH")
++    if candidate.preconditions_compatible is not True:
++        return Decision(False, "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
++    if candidate.exceptions_compatible is not True:
++        return Decision(False, "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
++    return Decision(True, "ACCEPTED")
+-- 
+2.47.3
+
+
+From a0afb6ae2a411f448a8857df58e75387d8d6d20d Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:38 +0330
+Subject: [PATCH 08/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/test_gate.py | 80 ++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/test_gate.py
+
+diff --git a/experiments/cross_domain_safety/test_gate.py b/experiments/cross_domain_safety/test_gate.py
+new file mode 100644
+index 0000000..a902953
+--- /dev/null
++++ b/experiments/cross_domain_safety/test_gate.py
+@@ -0,0 +1,80 @@
++"""Adversarial and conformance tests for the executable reference contract."""
++import unittest
++from gate import Candidate, decide
++
++
++def valid(**overrides):
++    fields = dict(
++        request_domain="law.contracts",
++        capsule_domain="law.contracts",
++        request_contract_version="v1",
++        capsule_contract_version="v1",
++        preconditions_compatible=True,
++        exceptions_compatible=True,
++        request_validated=True,
++        capsule_validated=True,
++        provenance_valid=True,
++    )
++    fields.update(overrides)
++    return Candidate(**fields)
++
++
++class GateTests(unittest.TestCase):
++    def test_compatible_candidate_is_accepted(self):
++        self.assertEqual(decide(valid()).reason, "ACCEPTED")
++        self.assertTrue(decide(valid()).accepted)
++
++    def test_domain_mismatch_is_rejected(self):
++        self.assertEqual(decide(valid(capsule_domain="finance.tax")).reason, "DOMAIN_MISMATCH")
++
++    def test_missing_domain_fails_closed(self):
++        self.assertEqual(decide(valid(request_domain=None)).reason, "DOMAIN_MISSING")
++
++    def test_contract_version_mismatch_is_rejected(self):
++        self.assertEqual(decide(valid(capsule_contract_version="v0")).reason, "CONTRACT_VERSION_MISMATCH")
++
++    def test_missing_contract_version_fails_closed(self):
++        self.assertEqual(decide(valid(request_contract_version="")).reason, "CONTRACT_VERSION_MISSING")
++
++    def test_unknown_precondition_fails_closed(self):
++        self.assertEqual(decide(valid(preconditions_compatible=None)).reason,
++                         "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
++
++    def test_incompatible_exception_policy_is_rejected(self):
++        self.assertEqual(decide(valid(exceptions_compatible=False)).reason,
++                         "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
++
++    def test_unknown_exception_policy_fails_closed(self):
++        self.assertEqual(decide(valid(exceptions_compatible=None)).reason,
++                         "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
++
++    def test_unvalidated_request_is_rejected(self):
++        self.assertEqual(decide(valid(request_validated=False)).reason, "REQUEST_NOT_VALIDATED")
++
++    def test_unvalidated_capsule_is_rejected(self):
++        self.assertEqual(decide(valid(capsule_validated=False)).reason, "CAPSULE_NOT_VALIDATED")
++
++    def test_invalid_provenance_is_rejected(self):
++        self.assertEqual(decide(valid(provenance_valid=False)).reason, "PROVENANCE_INVALID")
++
++    def test_each_required_condition_is_necessary(self):
++        failures = [
++            dict(request_domain="law.contracts", capsule_domain="finance.tax"),
++            dict(request_contract_version="v1", capsule_contract_version="v2"),
++            dict(preconditions_compatible=False),
++            dict(exceptions_compatible=False),
++            dict(request_validated=False),
++            dict(capsule_validated=False),
++            dict(provenance_valid=False),
++        ]
++        for override in failures:
++            with self.subTest(override=override):
++                self.assertFalse(decide(valid(**override)).accepted)
++
++    def test_no_candidate_is_accepted_when_required_boolean_is_unknown(self):
++        self.assertFalse(decide(valid(preconditions_compatible=None)).accepted)
++        self.assertFalse(decide(valid(exceptions_compatible=None)).accepted)
++
++
++if __name__ == "__main__":
++    unittest.main(verbosity=2)
+-- 
+2.47.3
+
+
+From 79d7a0d5592b751acf494a235f6361918ff2ec57 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:41 +0330
+Subject: [PATCH 09/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/README.md | 33 +++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/README.md
+
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+new file mode 100644
+index 0000000..97a872d
+--- /dev/null
++++ b/experiments/cross_domain_safety/README.md
+@@ -0,0 +1,33 @@
++# Cross-domain safety reference tests
++
++## Purpose and limitation
++
++This folder provides an executable, standard-library Python reference model for the **abstract acceptance contract** in `docs/section-5-cross-domain-safety.md`. It makes the fail-closed rule concrete and supplies deterministic conformance/adversarial tests.
++
++It is **not** the SCRS production implementation and does not validate real domain extraction, canonicalization, compatibility-policy completeness, signatures, or bypass resistance in a deployed pipeline. The booleans `request_validated`, `capsule_validated`, and `provenance_valid` are trusted inputs to this reference model; production code must connect them to real verification mechanisms.
++
++## Requirements
++
++- Python 3.10 or newer
++- No third-party dependencies
++
++## Run
++
++From this directory:
++
++```sh
++python -m unittest -v
++```
++
++Expected outcome: 12 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++
++## Mapping to production
++
++Before claiming implementation conformance, map each field to the production schema and validation function, then run equivalent tests against the actual gate and record:
++- source commit and dependency/runtime versions;
++- fixture manifest and expected decision/reason;
++- raw per-case outputs;
++- counts of incompatible cases, incorrect acceptances, and compatible cases incorrectly rejected;
++- an appropriate binomial confidence interval.
++
++Do not report an empirical zero error rate from this reference suite.
+-- 
+2.47.3
+
+
+From 6ce1a70387bde73a4ab154850f427d127b146694 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:43 +0330
+Subject: [PATCH 10/19] Add executable reference model and adversarial tests
+ for R3
+
+---
+ experiments/cross_domain_safety/fixtures.json | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 experiments/cross_domain_safety/fixtures.json
+
+diff --git a/experiments/cross_domain_safety/fixtures.json b/experiments/cross_domain_safety/fixtures.json
+new file mode 100644
+index 0000000..b78cd3a
+--- /dev/null
++++ b/experiments/cross_domain_safety/fixtures.json
+@@ -0,0 +1,15 @@
++{
++  "schema_version": 1,
++  "purpose": "Illustrative fixture manifest for the reference contract; not production test data.",
++  "cases": [
++    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true},
++    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false},
++    {"id": "missing-domain", "expected": "DOMAIN_MISSING", "compatible": false},
++    {"id": "stale-contract", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false},
++    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
++    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
++    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false},
++    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false},
++    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false}
++  ]
++}
+-- 
+2.47.3
+
+
+From 0a73023dd407999f16befafe1524f20a4b38a568 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:39:52 +0330
+Subject: [PATCH 11/19] Correct reference test count in instructions
+
+---
+ experiments/cross_domain_safety/README.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+index 97a872d..a5a5df1 100644
+--- a/experiments/cross_domain_safety/README.md
++++ b/experiments/cross_domain_safety/README.md
+@@ -19,7 +19,7 @@ From this directory:
+ python -m unittest -v
+ ```
+ 
+-Expected outcome: 12 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++Expected outcome: 13 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
+ 
+ ## Mapping to production
+ 
+-- 
+2.47.3
+
+
+From d75229447479cd527d3feb7aaa005ec5c60eeca7 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 12:40:21 +0330
+Subject: [PATCH 12/19] Record reference-model test result and evidence
+ boundary
+
+---
+ docs/research-validation-ledger.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index fbb972c..7786c08 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,6 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
+-| Cross-domain gate rejection property | Conditional specification drafted; implementation conformance unverified | `docs/section-5-cross-domain-safety.md` defines explicit assumptions, fail-closed semantics, and a test protocol; no code/test output is claimed | Implement or map the gate to reference code; run the published conformance and adversarial suite; report counts and confidence interval |
++| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics; `experiments/cross_domain_safety/` contains a standard-library reference model and 13 tests. The equivalent local test suite passed (13/13); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
+ | End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+-- 
+2.47.3
+
+
+From 6fe4ca9b64e1d7a4985ff83a3e8f147dcbab4609 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:17:58 +0330
+Subject: [PATCH 13/19] docs(research): plan free public evidence acquisition
+
+---
+ docs/free-public-evidence-acquisition.md | 91 ++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
+ create mode 100644 docs/free-public-evidence-acquisition.md
+
+diff --git a/docs/free-public-evidence-acquisition.md b/docs/free-public-evidence-acquisition.md
+new file mode 100644
+index 0000000..6eb34e4
+--- /dev/null
++++ b/docs/free-public-evidence-acquisition.md
+@@ -0,0 +1,91 @@
++# Free public evidence acquisition plan for SCRS
++
++**Status:** source-discovery baseline; no result here is claimed as measured SCRS performance.  
++**Goal:** establish a reproducible, zero-cost public-data pipeline for strengthening the SCRS manuscript.  
++**Policy:** preserve provenance and licence terms. Do not commit third-party raw data until redistribution rights, file size, and source integrity are checked. Prefer manifests, deterministic retrieval scripts, checksums, and small derived fixtures.
++
++## 1. Evidence classes
++
++Label every artifact and claim as **theoretical**, **public-benchmark evaluation**, **synthetic/simulated**, **measured deployment**, **literature-supported**, or **unresolved**.
++
++Public benchmarks can test semantic preservation, retrieval, decision correctness, transfer-gate behavior, and reproducibility. They cannot establish real production API costs, provider billing, network round trips, or deployment latency.
++
++## 2. Candidate public resources
++
++| Resource | Intended use | Cost/access | Limitations |
++|---|---|---|---|
++| [LegalBench](https://hazyresearch.stanford.edu/legalbench/) | Diverse legal reasoning tasks; decision-relevant fact preservation and downstream answer consistency | Public benchmark; task data via Hugging Face | Review each task's terms and evaluation requirements; some tasks need manual grading |
++| [LegalBench download/evaluation guide](https://hazyresearch.stanford.edu/legalbench/getting-started/) | Canonical download instructions, prompts, and evaluation guidance | Public documentation | Follow task-level protocols rather than merging all tasks into one score |
++| [LegalBench-RAG repository](https://github.com/zeroentropy-ai/legalbench) | Clause/span retrieval and evidence grounding; test whether a capsule preserves exact supporting evidence | Public repository; inspect current files and underlying dataset terms before redistribution | Packaging licence does not automatically cover every underlying document |
++| [vLLM benchmark CLI](https://docs.vllm.ai/en/latest/cli/bench/) | Reusable local serving benchmark patterns and definitions for TTFT, TPOT, ITL, end-to-end latency, and throughput | Open-source tooling; local/synthetic workloads possible | Tooling does not itself provide SCRS evidence; real measurement needs a running system and documented environment |
++| [vLLM benchmark harness](https://github.com/vllm-project/vllm-bench) | Reproducible benchmark harness and machine-readable result patterns | Public source repository | Record exact version and workload; prefix-cache reuse can distort comparisons |
++| [FRAMES discovery listing](https://rag-repo.org/datasets/) | Candidate multi-hop retrieval/reasoning stress test | Public discovery listing | Verify canonical source, split, and licence before use |
++
++**Initial priority:** start with a licence-reviewed subset of LegalBench and LegalBench-RAG. Add an original synthetic adversarial suite for SCRS-specific invariants: deadlines, thresholds, exceptions, exclusions, jurisdiction, evidence admissibility, tenant scope, adapter/version mismatch, and transfer denial. Expand to other domains only after the core protocol is stable.
++
++## 3. Dataset inclusion gate
++
++Before importing any dataset, record:
++
++1. Canonical source, publisher, version/revision, retrieval date, and source commit/tag where available.
++2. Licence for both benchmark packaging and underlying data; redistribution and attribution requirements.
++3. Task/split, record count, fields used, filtering rules, and excluded records.
++4. Raw-file SHA-256, byte size, extraction command, and preprocessing version.
++5. Whether raw data may be committed. If not, commit the manifest, retrieval script, checksum, and local cache instructions only.
++6. Any personal/sensitive data, copyright restrictions, or access conditions; never upload restricted content.
++7. Evaluation mapping: input, gold evidence/answer, SCRS output, baseline output, scoring function, and human-review requirements.
++
++## 4. Minimum evaluation protocol
++
++For each task, compare at least:
++
++- **Original-context baseline:** solve using the uncompressed source context.
++- **Capsule-only:** solve using the SCRS-extracted representation.
++- **Capsule + compiled graph/gates:** apply the declared decision graph and compatibility checks.
++- **Ablations:** remove one critical field or gate at a time.
++- **Adversarial counterexamples:** near-duplicate cases differing in exactly one decision-relevant condition.
++
++Report task-level and aggregate metrics, uncertainty intervals where appropriate, failure taxonomy, sample size, split, seeds, model/version, and exact commands. Avoid leakage between prompt development and final evaluation. Declare the primary metric and decision rule before final evaluation.
++
++## 5. SCRS-specific tests to build
++
++The initial local fixture should cover:
++
++- Preservation of obligations, deadlines, thresholds, exceptions, exclusions, negation, and other decision-relevant facts.
++- Type-safe bindings, deterministic graph execution, termination, and cycle rejection.
++- Compatibility gates for domain, jurisdiction, adapter version, tenant scope, transfer licence, preconditions, and evidence admissibility.
++- Negative controls where a single gate mismatch must force a safe miss/bailout.
++- Counterexample pairs differing in one decision-relevant feature.
++- Algorithm-counter invariants, including n_int and oracleCallsAvoided.
++- Probability normalization and consistency among equations, tables, and generated outputs.
++
++These original fixtures are useful tests, but do not replace independent public-benchmark evaluation.
++
++## 6. Runtime and cost evidence policy
++
++Do not derive empirical P50/P95 from expected-value equations. For real latency/cost claims, capture implementation commit, environment/hardware, model/provider and pricing snapshot, request ID, logical anchor count, actual HTTP attempts, retries, batching/cache hits, input/output token counts, stage timestamps, fallback status, errors/timeouts, and billed usage when available. Redact request content and secrets.
++
++Until real traces exist, keep current scenario outputs labelled **synthetic** and report sensitivity analyses over declared assumptions. Public benchmark runs may validate algorithms and local runtime behavior, but cannot prove provider billing or production network behavior.
++
++## 7. Proposed repository layout
++
++- data/README.md — dataset catalogue, licence decisions, retrieval instructions.
++- data/manifests/*.json — source, licence, split, checksum, and preprocessing metadata.
++- data/fixtures/scrs_adversarial_cases.jsonl — small original test fixtures.
++- scripts/data/download_public_benchmarks.py — deterministic public-data retrieval and verification.
++- scripts/evaluation/run_public_benchmarks.py — benchmark adapters and metrics.
++- results/public-benchmarks/<run-id>/ — machine-readable results, configuration, logs, and manifest.
++- docs/research-validation-ledger.md — claim-to-evidence status and links to generated artifacts.
++
++Do not add large third-party data or change manuscript claims until the licence review, protocol, and reproducibility checks pass.
++
++## 8. Sources
++
++- Stanford LegalBench: https://hazyresearch.stanford.edu/legalbench/
++- LegalBench getting started: https://hazyresearch.stanford.edu/legalbench/getting-started/
++- LegalBench-RAG: https://github.com/zeroentropy-ai/legalbench
++- vLLM benchmark CLI: https://docs.vllm.ai/en/latest/cli/bench/
++- vLLM benchmark harness: https://github.com/vllm-project/vllm-bench
++- FRAMES discovery listing: https://rag-repo.org/datasets/
++
++**Current status:** discovery only. Dataset files have not yet been imported, licence-reviewed, or evaluated under this plan.
+-- 
+2.47.3
+
+
+From 452696b0742737a0ab022ff6f9c88716a7d201a0 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:18:10 +0330
+Subject: [PATCH 14/19] docs(data): add public dataset governance and retrieval
+ policy
+
+---
+ data/README.md | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 data/README.md
+
+diff --git a/data/README.md b/data/README.md
+new file mode 100644
+index 0000000..e2d5a9f
+--- /dev/null
++++ b/data/README.md
+@@ -0,0 +1,23 @@
++# Data and evaluation assets
++
++This directory holds dataset manifests, small original fixtures, and instructions for reproducible retrieval of public benchmarks.
++
++## Data policy
++
++- Do not commit third-party datasets until their source and redistribution licence have been checked.
++- Prefer canonical upstream retrieval scripts plus SHA-256 manifests for large or non-redistributable sources.
++- Keep train/development/test splits separate; never tune prompts or thresholds on the final test split.
++- Keep public-benchmark results, synthetic simulations, and real deployment measurements in separate locations and label them clearly.
++- Do not store API keys, user data, private prompts, or sensitive request logs.
++
++## Current assets
++
++- fixtures/scrs_adversarial_cases.jsonl — original, hand-authored schema examples for testing whether decision-relevant conditions survive representation changes. These are software test fixtures, not public benchmark results.
++- Public benchmark candidates and inclusion rules: docs/free-public-evidence-acquisition.md.
++
++## Next steps
++
++1. Verify licence and exact version for each chosen upstream dataset.
++2. Add a manifest with canonical URL, revision, split, licence, retrieval date, file hashes, and preprocessing version.
++3. Implement deterministic download/validation and benchmark adapters.
++4. Run baseline and SCRS variants without test-set tuning; publish machine-readable results and exact commands.
+-- 
+2.47.3
+
+
+From 46348a13cae3c70b19d9dcf0378822753da85182 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:18:13 +0330
+Subject: [PATCH 15/19] test(data): add original SCRS adversarial fixtures
+
+---
+ data/fixtures/scrs_adversarial_cases.jsonl | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 data/fixtures/scrs_adversarial_cases.jsonl
+
+diff --git a/data/fixtures/scrs_adversarial_cases.jsonl b/data/fixtures/scrs_adversarial_cases.jsonl
+new file mode 100644
+index 0000000..381a93b
+--- /dev/null
++++ b/data/fixtures/scrs_adversarial_cases.jsonl
+@@ -0,0 +1,12 @@
++{"case_id":"deadline-preserved-001","task":"semantic_preservation","source":{"rule":"File the appeal within 30 calendar days after service.","facts":{"service_date":"2026-01-01","deadline_days":30,"day_type":"calendar","trigger":"service"}},"capsule":{"obligation":"file appeal","deadline_days":30,"day_type":"calendar","trigger":"service"},"expected":{"preserve":true,"decision":"deadline is 30 calendar days after service"},"mutation":"none"}
++{"case_id":"deadline-loss-001","task":"semantic_preservation","source":{"rule":"File the appeal within 30 calendar days after service.","facts":{"service_date":"2026-01-01","deadline_days":30,"day_type":"calendar","trigger":"service"}},"capsule":{"obligation":"file appeal","deadline_days":30,"day_type":"business","trigger":"service"},"expected":{"preserve":false,"reason":"calendar changed to business days"},"mutation":"day_type"}
++{"case_id":"exception-preserved-001","task":"semantic_preservation","source":{"rule":"A permit is required, except for emergency repairs necessary to prevent immediate harm.","facts":{"permit_required":true,"exception":"emergency repairs necessary to prevent immediate harm"}},"capsule":{"permit_required":true,"exception":"emergency repairs necessary to prevent immediate harm"},"expected":{"preserve":true,"decision":"exception retained"},"mutation":"none"}
++{"case_id":"exception-loss-001","task":"semantic_preservation","source":{"rule":"A permit is required, except for emergency repairs necessary to prevent immediate harm.","facts":{"permit_required":true,"exception":"emergency repairs necessary to prevent immediate harm"}},"capsule":{"permit_required":true,"exception":null},"expected":{"preserve":false,"reason":"exception omitted"},"mutation":"exception"}
++{"case_id":"threshold-preserved-001","task":"semantic_preservation","source":{"rule":"Escalate when exposure exceeds EUR 10000.","facts":{"operator":">","threshold":10000,"currency":"EUR"}},"capsule":{"operator":">","threshold":10000,"currency":"EUR"},"expected":{"preserve":true,"decision":"strict threshold retained"},"mutation":"none"}
++{"case_id":"threshold-loss-001","task":"semantic_preservation","source":{"rule":"Escalate when exposure exceeds EUR 10000.","facts":{"operator":">","threshold":10000,"currency":"EUR"}},"capsule":{"operator":">=","threshold":10000,"currency":"EUR"},"expected":{"preserve":false,"reason":"strict greater-than changed to greater-than-or-equal"},"mutation":"operator"}
++{"case_id":"jurisdiction-gate-001","task":"compatibility_gate","source":{"domain":"employment_law","jurisdiction":"DE","adapter_version":"v2","tenant_scope":"tenant-a"},"capsule":{"domain":"employment_law","jurisdiction":"DE","adapter_version":"v2","tenant_scope":"tenant-a"},"expected":{"transfer_allowed":true},"mutation":"none"}
++{"case_id":"jurisdiction-gate-deny-001","task":"compatibility_gate","source":{"domain":"employment_law","jurisdiction":"DE","adapter_version":"v2","tenant_scope":"tenant-a"},"capsule":{"domain":"employment_law","jurisdiction":"US","adapter_version":"v2","tenant_scope":"tenant-a"},"expected":{"transfer_allowed":false,"reason":"jurisdiction mismatch"},"mutation":"jurisdiction"}
++{"case_id":"tenant-gate-deny-001","task":"compatibility_gate","source":{"tenant_scope":"tenant-a","licence":"internal-only"},"capsule":{"tenant_scope":"tenant-b","licence":"internal-only"},"expected":{"transfer_allowed":false,"reason":"tenant scope mismatch"},"mutation":"tenant_scope"}
++{"case_id":"negation-preserved-001","task":"semantic_preservation","source":{"rule":"The applicant is not eligible if the filing is late.","facts":{"condition":"filing_late","effect":"not_eligible"}},"capsule":{"condition":"filing_late","effect":"not_eligible"},"expected":{"preserve":true},"mutation":"none"}
++{"case_id":"negation-loss-001","task":"semantic_preservation","source":{"rule":"The applicant is not eligible if the filing is late.","facts":{"condition":"filing_late","effect":"not_eligible"}},"capsule":{"condition":"filing_late","effect":"eligible"},"expected":{"preserve":false,"reason":"negation/effect reversed"},"mutation":"effect"}
++{"case_id":"evidence-admissibility-deny-001","task":"compatibility_gate","source":{"evidence_type":"authenticated_document","admissible":true},"capsule":{"evidence_type":"unverified_summary","admissible":false},"expected":{"transfer_allowed":false,"reason":"evidence admissibility mismatch"},"mutation":"evidence_type"}
+-- 
+2.47.3
+
+
+From f567375ca9e55aae232bbbca7d2963043c299a4a Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:19:21 +0330
+Subject: [PATCH 16/19] Update docs/section-5-cross-domain-safety.md
+
+Co-authored-by: cubic-dev-ai[bot] <191113872+cubic-dev-ai[bot]@users.noreply.github.com>
+---
+ docs/section-5-cross-domain-safety.md | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/docs/section-5-cross-domain-safety.md b/docs/section-5-cross-domain-safety.md
+index 1fa9683..aa2ff4b 100644
+--- a/docs/section-5-cross-domain-safety.md
++++ b/docs/section-5-cross-domain-safety.md
+@@ -91,7 +91,7 @@ Define the empirical incorrect-acceptance rate as
+ \frac{N_{\mathrm{incorrect\_accept}}}
+ {N_{\mathrm{known\_incompatible\_cases}}}.
+ \]
+-Do not use a denominator that mixes compatible and incompatible cases. Report the numerator, denominator, dataset construction, and an appropriate binomial confidence interval. If zero incorrect acceptances are observed, report “0 observed in n tested incompatible cases” with the interval; do not report a proven population rate of zero.
++Do not use a denominator that mixes compatible and incompatible cases. For a prespecified random sample, report the numerator, denominator, dataset construction, sampling model, and a 95% Clopper–Pearson interval; for a fixed adversarial suite, report finite-set counts without population inference. If zero incorrect acceptances are observed, report “0 observed in n tested incompatible cases” with the interval; do not report a proven population rate of zero.
+ 
+ The test suite should also report compatible-case rejection separately, since a gate that rejects everything would trivially avoid incorrect acceptance but would not be useful.
+ 
+-- 
+2.47.3
+
+
+From 54772fd59ee43887da40d1302db5215bbe32c119 Mon Sep 17 00:00:00 2001
+From: DiabloNova <diablonova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 16:12:17 +0000
+Subject: [PATCH 17/19] fix(R2): resolve cubic review findings in counter
+ contract and telemetry
+
+- Tri-state anchor_provider_generation_evidence (CONFIRMED/UNKNOWN/UNAVAILABLE
+  with mandatory reason codes); count advances only on CONFIRMED
+- Confirmed-response branch now names every counter update incl. per-generation
+  billing UNAVAILABLE(BILLING_FEED_MISSING) instead of zero
+- Timeout/error branch sets UNKNOWN reason codes; never advances generation count
+- Explicit mid-render halt/fallback branch: terminal_regime = FAST_PATH only on
+  clean EOS; every other exit reports FALLBACK with full_oracle_fallback_count
+- Mandatory ingestion dedup rule by stable event_id with conflict handling;
+  counters advanced only by the runtime state machine
+- telemetry-schema.json v2 + request/event CSV templates aligned with contract
+- next-steps.md names both instrumentation boundaries (runtime-event vs transport)
+---
+ docs/next-steps.md                            |  2 +-
+ docs/section-8-3-algorithm.md                 | 59 ++++++++++++++---
+ docs/section-8-4-telemetry.md                 | 10 +--
+ telemetry/event-telemetry-template.csv        |  2 +
+ .../implementation-telemetry-template.csv     |  3 +-
+ telemetry/telemetry-schema.json               | 64 +++++++++++++++----
+ 6 files changed, 113 insertions(+), 27 deletions(-)
+ create mode 100644 telemetry/event-telemetry-template.csv
+
+diff --git a/docs/next-steps.md b/docs/next-steps.md
+index e21fd8d..c7aa0d2 100644
+--- a/docs/next-steps.md
++++ b/docs/next-steps.md
+@@ -1,7 +1,7 @@
+ # Next steps, ordered by evidence dependency
+ 
+ 1. **Obtain source implementation:** provide the reference implementation repository/commit or source files for Anchor, interrupt handling, retries, batching, and fallback.
+-2. **Instrument transport semantics:** apply the Section 8.3 counter contract at the actual transport boundary; distinguish logical interrupts, attempts, provider-confirmed generations, and returned/billed tokens.
++2. **Instrument both counter boundaries:** apply the Section 8.3 counter contract at the correct boundary for each counter. The **runtime-event boundary** (inside the local runtime) owns `anchor_interrupt_count` and `full_oracle_fallback_count`; the **transport boundary** (inside the instrumented API client) owns `anchor_transport_attempt_count`, the tri-state `anchor_provider_generation_count`/`anchor_provider_generation_evidence`, `anchor_tokens_returned`/`anchor_tokens_billed`, and the full-Oracle attempt/generation counters. Runtime-event counters must never be incremented at the transport layer, and attempt counts must never be derived from logical events; only attempt counts belong at the transport boundary in the sense that every increment corresponds to an actual HTTP/API issuance or provider-evidence reconciliation.
+ 3. **Validate counter behavior:** test the cases specified in Section 8.3, including no interrupt, multiple interrupts, retries, unknown timeout outcomes, miss fallback, and halt followed by fallback.
+ 4. **Instrument telemetry:** implement the request-level and event-level records in Section 8.4; redact sensitive content and preserve unknown values rather than coercing them to zero.
+ 5. **Validate the equations:** test regime probabilities and expected token/cost formulas, retaining separate bailout and miss means when needed.
+diff --git a/docs/section-8-3-algorithm.md b/docs/section-8-3-algorithm.md
+index a981de3..1320215 100644
+--- a/docs/section-8-3-algorithm.md
++++ b/docs/section-8-3-algorithm.md
+@@ -8,14 +8,30 @@ The following counters have distinct units and scopes. They are request-scoped a
+ 
+ - `anchor_interrupt_count`: number of logical interrupt events raised by the local runtime. Increment exactly once when an interrupt condition is accepted and the runtime commits to requesting Anchor support. Do not increment for every token considered or every retry.
+ - `anchor_transport_attempt_count`: number of transport attempts initiated for Anchor requests, including retries. Increment at the transport boundary for each attempt.
+-- `anchor_provider_generation_count`: number of provider generations confirmed by provider response or billing evidence. A timed-out attempt with unknown provider outcome must be recorded as unknown, not silently counted as zero.
++- `anchor_provider_generation_count` and `anchor_provider_generation_evidence`: a **tri-state** observation. `anchor_provider_generation_evidence` is one of `CONFIRMED`, `UNKNOWN` (with a mandatory reason code such as `TIMEOUT_OUTCOME_UNKNOWN`, `TRANSPORT_ERROR`, or `PROVIDER_RESPONSE_MALFORMED`), or `UNAVAILABLE` (with a mandatory reason code such as `BILLING_FEED_MISSING`). `anchor_provider_generation_count` is incremented **only** in the `CONFIRMED` state; it is never advanced when the state is `UNKNOWN` or `UNAVAILABLE`. A timed-out attempt with unknown provider outcome must leave the evidence state `UNKNOWN`, not silently advance or reset the count to zero. The request summary must report the evidence state alongside the count, so a zero can never stand in for an unresolved or unavailable observation.
+ - `anchor_tokens_returned`: tokens present in successful Anchor responses, using the declared tokenizer and counting rule.
+-- `anchor_tokens_billed`: tokens the provider reports as billable. Keep this separate from returned tokens because retries, failed responses, minimum billing, or provider accounting may make them differ.
++- `anchor_tokens_billed`: tokens the provider reports as billable. Keep this separate from returned tokens because retries, failed responses, minimum billing, or provider accounting may make them differ. When no billing feed is available for a confirmed generation, record `anchor_tokens_billed` as `UNAVAILABLE` (reason `BILLING_FEED_MISSING`) for that generation rather than as zero.
+ - `full_oracle_fallback_count`: number of full-reasoning fallback operations initiated for the request. A fallback is caused by a miss or a halted execution; it is not an Anchor interrupt.
+ - `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: transport attempts and confirmed provider generations for full-reasoning fallback, tracked separately from Anchor support.
+ 
+ A logical interrupt, transport attempt, provider generation, and token are different units. Their counts are not assumed to be equal. The algorithm can define and increment logical events exactly; actual provider generations and billed tokens require provider-side evidence and must be marked unknown when that evidence is unavailable.
+ 
++### Counter boundaries
++
++Two distinct instrumentation boundaries are involved, and every counter belongs to exactly one of them:
++
++- **Runtime-event boundary (inside the local runtime):** `anchor_interrupt_count`, `full_oracle_fallback_count`. These are logical events the runtime raises; they are incremented exactly once per accepted event, independently of transport behavior.
++- **Transport boundary (inside the instrumented client):** `anchor_transport_attempt_count`, `anchor_provider_generation_count`/`anchor_provider_generation_evidence`, `anchor_tokens_returned`, `anchor_tokens_billed`, `full_oracle_transport_attempt_count`, `full_oracle_provider_generation_count`. These are incremented only where HTTP/API requests are actually issued or provider responses/billing evidence is reconciled.
++
++### Event identity and deduplication
++
++An event identifier alone does not prevent duplicate counting: a replayed callback or at-least-once delivery would otherwise duplicate records. The following deduplication rule is mandatory:
++
++1. Every event carries a stable `event_id` derived from `(request_id_hash, causal_interrupt_seq, attempt_number, event_type)`.
++2. The ingestion layer deduplicates by `event_id` **before** any aggregation: the first occurrence is stored, later occurrences with an identical payload are recorded as replay marks and never re-counted.
++3. If a later occurrence carries a conflicting payload, it is retained with a `conflict` flag and surfaced in the missing-data/conflict report; it does not update counters.
++4. Counters in Algorithm 1 are advanced by the runtime state machine at the increment points defined below; ingestion replay therefore cannot inflate them.
++
+ ## Corrected Algorithm 1 counter semantics
+ 
+ ```text
+@@ -43,16 +59,39 @@ On an admitted, validated candidate:
+                     increment anchor_transport_attempt_count
+                     emit an attempt event with outcome and retry metadata
+                 on confirmed provider response:
+-                    record provider generation evidence, returned tokens,
+-                    and provider-billed tokens separately
++                    increment anchor_provider_generation_count by 1
++                    set anchor_provider_generation_evidence = CONFIRMED
++                    add returned tokens to anchor_tokens_returned
++                    add provider-billed tokens to anchor_tokens_billed;
++                        if no billing feed covers this generation,
++                        mark that generation's billing as UNAVAILABLE
++                        (reason BILLING_FEED_MISSING) instead of zero
+                     append returned Anchor text to the answer
+-                on error:
+-                    record error and whether provider outcome is known;
++                on timeout or error:
++                    do NOT increment anchor_provider_generation_count;
++                    set anchor_provider_generation_evidence = UNKNOWN with the
++                        reason code (TIMEOUT_OUTCOME_UNKNOWN or TRANSPORT_ERROR);
++                    leave billing for this attempt UNKNOWN pending reconciliation;
++                    record the error and whether the provider outcome is known;
+                     apply the declared retry/fallback policy
+                 update cooldown state
++
++                if the retry/fallback policy now declares a mid-render halt
++                or fallback (for example: Anchor unrecoverable, render
++                mismatch, or max-token cap reached):
++                    terminal_regime = FALLBACK
++                    increment full_oracle_fallback_count when full fallback
++                        is initiated
++                    invoke full Oracle fallback through the instrumented
++                        client; record attempts, confirmed generations,
++                        token counts, and unknown outcomes as above
++                    retain all accumulated Anchor counter values
++                    emit request and event telemetry
++                    return the fallback answer and telemetry
+             else:
+                 append the local token
+ 
++        # reached EOS without any declared mid-render fallback
+         terminal_regime = FAST_PATH
+         emit request and event telemetry
+         return answer and telemetry
+@@ -66,7 +105,7 @@ On retrieval/admission miss:
+     return fallback answer and telemetry
+ ```
+ 
+-This is a counter contract, not a claim that a reference implementation or production trace already exists. The client instrumentation must be implemented at the actual transport boundary to count retries accurately.
++This is a counter contract, not a claim that a reference implementation or production trace already exists. The client instrumentation must be implemented at the actual transport boundary to count retries accurately. `terminal_regime = FAST_PATH` is assigned **only** when rendering reaches EOS without a declared mid-render halt or fallback; every other exit path from the rendering loop must pass through the mid-render fallback branch above, so a request that fell back after one or more Anchor interrupts is always reported as `FALLBACK` with a non-zero `full_oracle_fallback_count` and is never summarized as a fast-path success.
+ 
+ ## Replacement for `oracleCallsAvoided`
+ 
+@@ -80,11 +119,13 @@ For requests that terminate successfully on the fast path, report `full_oracle_f
+ 2. Fast path with one interrupt and one successful attempt: one logical interrupt, one transport attempt, and provider/token counts taken from the response and billing evidence.
+ 3. Fast path with multiple interrupts: each accepted interrupt increments the logical counter once; attempts and tokens accumulate independently.
+ 4. Retry after transport failure: one logical interrupt but multiple transport attempts; provider generation count follows evidence, not attempt count.
+-5. Timeout with unknown provider outcome: attempt is counted; provider generation/billing is unknown until evidence resolves it.
++5. Timeout with unknown provider outcome: attempt is counted; provider generation count is NOT incremented and the evidence state is `UNKNOWN` (reason `TIMEOUT_OUTCOME_UNKNOWN`) until evidence resolves it; billing for the attempt is `UNKNOWN`, not zero.
+ 6. Miss without any Anchor interrupt: full fallback is counted and fallback-avoided is false.
+ 7. Halt after one or more Anchor events: Anchor counters retain their accumulated values and full fallback is also counted.
++7a. Mid-render policy fallback (Anchor unrecoverable, render mismatch, or max-token cap after one or more interrupts): `terminal_regime = FALLBACK`, `full_oracle_fallback_count >= 1`, accumulated Anchor counters retained, and the request is never summarized as fast-path success.
+ 8. Empty or failed Anchor response: interrupt and attempt events remain visible; returned and billed token counts follow observed evidence and may differ.
+-9. Duplicate delivery or callback: event identifiers prevent a single logical event from being counted twice.
++9. Duplicate delivery or callback: ingestion deduplicates by the stable `event_id`; identical replays are marked and never re-counted; conflicting payloads are flagged and surfaced. The request-level counters are unchanged by replay.
+ 10. All request paths: every emitted counter has a documented unit, scope, and source of evidence; no unknown value is silently represented as zero.
++11. Missing billing feed: provider generation is `CONFIRMED` but billing is `UNAVAILABLE` (reason `BILLING_FEED_MISSING`); the returned-token count is still reported, and the billed-token summary carries the unavailable marker rather than a zero.
+ 
+ The pseudocode in the original manuscript used `n_int` for an interrupt counter but did not increment it. The replacement uses explicit names and a documented event boundary to remove that ambiguity.
+diff --git a/docs/section-8-4-telemetry.md b/docs/section-8-4-telemetry.md
+index 1483154..7c0f3b0 100644
+--- a/docs/section-8-4-telemetry.md
++++ b/docs/section-8-4-telemetry.md
+@@ -6,11 +6,11 @@ Collect a request-level record and a separate event-level record for each logica
+ 
+ Keep these quantities separate:
+ 
+-- `anchor_interrupt_count`: logical interrupt events accepted by the local runtime.
+-- `anchor_transport_attempt_count`: actual Anchor transport attempts, including retries.
+-- `anchor_provider_generation_count`: provider generations confirmed by response or billing evidence.
++- `anchor_interrupt_count`: logical interrupt events accepted by the local runtime (runtime-event boundary).
++- `anchor_transport_attempt_count`: actual Anchor transport attempts, including retries (transport boundary).
++- `anchor_provider_generation_count` with `anchor_provider_generation_evidence` ∈ {`CONFIRMED`, `UNKNOWN` + reason, `UNAVAILABLE` + reason}: a tri-state observation. The count is advanced only in the `CONFIRMED` state; `UNKNOWN`/`UNAVAILABLE` observations carry their reason codes and never collapse to zero.
+ - `anchor_tokens_returned`: tokens returned by successful Anchor responses.
+-- `anchor_tokens_billed`: tokens reported as billable by the provider.
++- `anchor_tokens_billed`: tokens reported as billable by the provider; per-generation `UNAVAILABLE` (reason `BILLING_FEED_MISSING`) when no billing feed covers a confirmed generation.
+ - `full_oracle_fallback_count`: full-reasoning fallback operations initiated after a miss or halt.
+ - `full_oracle_transport_attempt_count` and `full_oracle_provider_generation_count`: full-fallback attempts and confirmed generations, separate from Anchor activity.
+ 
+@@ -20,6 +20,8 @@ For each count, document its unit, request scope, increment point, and evidence
+ 
+ At minimum, event records should include: event ID; parent request ID; causal interrupt ID where applicable; event type; monotonic start/end times; UTC correlation timestamp; attempt number; retry/batch/cache status; provider request ID in redacted or pseudonymized form; outcome/error category; model and region; input/output token values and whether they are returned or billed; cost basis and price tier; and an explicit evidence status such as `observed`, `provider-confirmed`, `estimated`, or `unknown`.
+ 
++**Ingestion deduplication (mandatory).** Event identifiers alone do not prevent duplicate counting under at-least-once delivery. The ingestion layer must deduplicate by the stable `event_id` derived from `(request_id_hash, causal_interrupt_seq, attempt_number, event_type)` before any aggregation: identical replays are stored as replay marks and never re-counted; conflicting payloads are retained with a `conflict` flag and surfaced in the missing-data report. Request-level counters are advanced only by the runtime state machine at the increment points of Section 8.3, so ingestion replay cannot inflate them. State the conflict-rate alongside the missing-data rate in every aggregate report.
++
+ For local execution, capture candidate admission, gate result, deterministic-execution outcome, rendering start/end, interrupt predicate and accepted interrupt timestamp, partial tokens at halt, fallback start/end, and terminal regime. Use monotonic timestamps for duration calculations and UTC timestamps for cross-system correlation. State how duplicate events are deduplicated and how partial or missing records affect aggregates.
+ 
+ ## Derived metrics
+diff --git a/telemetry/event-telemetry-template.csv b/telemetry/event-telemetry-template.csv
+new file mode 100644
+index 0000000..e98f8e9
+--- /dev/null
++++ b/telemetry/event-telemetry-template.csv
+@@ -0,0 +1,2 @@
++schema_version,request_id_hash,event_id,causal_interrupt_seq,attempt_number,event_type,parent_event_id,provider_request_id_redacted,batch_id,start_monotonic_ms,end_monotonic_ms,utc_correlation_timestamp,queue_wait_ms,ttft_ms,tpot_ms_per_token,input_tokens,input_token_basis,output_tokens,output_token_basis,evidence_status,provider_generation_evidence,provider_generation_unknown_reason,status,retry_reason,model,region,price_tier,ingest_replay_mark,ingest_conflict_flag
++2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+diff --git a/telemetry/implementation-telemetry-template.csv b/telemetry/implementation-telemetry-template.csv
+index 09581a0..e98b879 100644
+--- a/telemetry/implementation-telemetry-template.csv
++++ b/telemetry/implementation-telemetry-template.csv
+@@ -1 +1,2 @@
+-request_id_hash,config_version,deployment_version,timestamp_utc,regime,request_start_monotonic_ms,request_end_monotonic_ms,queue_wait_ms,oracle_ttft_ms,oracle_tpot_ms_per_token,oracle_input_tokens,oracle_output_tokens,oracle_call_count,anchor_logical_event_count,anchor_api_attempt_count,anchor_retry_count,anchor_batched_call_count,anchor_total_input_tokens,anchor_total_output_tokens,slm_generation_start_ms,slm_generation_end_ms,slm_generated_tokens,slm_render_start_ms,slm_render_end_ms,halt_decision_ms,partial_local_tokens_at_halt,fallback_start_ms,fallback_end_ms,bailout_incremental_overhead_ms,provider_model,price_tier,cached_input_tokens,terminal_status,notes_redacted
++schema_version,request_id_hash,config_version,deployment_version,timestamp_utc,terminal_regime,regime,request_start_monotonic_ms,request_end_monotonic_ms,queue_wait_ms,anchor_interrupt_count,anchor_transport_attempt_count,anchor_provider_generation_count,anchor_provider_generation_evidence,anchor_provider_generation_unknown_reasons,anchor_tokens_returned,anchor_tokens_billed,anchor_tokens_billed_evidence,full_oracle_fallback_count,full_oracle_transport_attempt_count,full_oracle_provider_generation_count,full_oracle_fallback_avoided,full_oracle_fallback_avoided_evidence,oracle_ttft_ms,oracle_tpot_ms_per_token,oracle_input_tokens,oracle_output_tokens,oracle_call_count,anchor_retry_count,anchor_batched_call_count,anchor_total_input_tokens,anchor_total_output_tokens,slm_generation_start_ms,slm_generation_end_ms,slm_generated_tokens,slm_render_start_ms,slm_render_end_ms,halt_decision_ms,partial_local_tokens_at_halt,fallback_start_ms,fallback_end_ms,bailout_incremental_overhead_ms,provider_model,price_tier,cached_input_tokens,terminal_status,notes_redacted
++2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+diff --git a/telemetry/telemetry-schema.json b/telemetry/telemetry-schema.json
+index 10d15dc..a5ba93e 100644
+--- a/telemetry/telemetry-schema.json
++++ b/telemetry/telemetry-schema.json
+@@ -1,21 +1,61 @@
+ {
+-  "description": "One row per request. For true per-call analysis, store a separate event-level table with one row per API attempt.",
++  "schema_version": 2,
++  "contract": "Section 8.3 counter contract / Section 8.4 telemetry requirements (research/p0-r2-counter-fix)",
++  "description": "One row per request at the request level, plus a separate event-level table with one row per logical interrupt, transport attempt, provider response, and full-reasoning fallback operation. Event rows join to the request row by request_id_hash. Ingestion MUST deduplicate events by event_id before aggregation (identical replays are replay marks; conflicting payloads carry a conflict flag and never update counters).",
+   "request_level_fields": [
+-    "request_id_hash", "config_version", "deployment_version", "timestamp_utc", "regime",
+-    "request_start_monotonic_ms", "request_end_monotonic_ms", "queue_wait_ms", "oracle_ttft_ms",
+-    "oracle_tpot_ms_per_token", "oracle_input_tokens", "oracle_output_tokens", "oracle_call_count",
+-    "anchor_logical_event_count", "anchor_api_attempt_count", "anchor_retry_count",
+-    "anchor_batched_call_count", "anchor_total_input_tokens", "anchor_total_output_tokens",
++    "request_id_hash", "config_version", "deployment_version", "timestamp_utc",
++    "terminal_regime", "regime",
++    "request_start_monotonic_ms", "request_end_monotonic_ms", "queue_wait_ms",
++    "anchor_interrupt_count", "anchor_transport_attempt_count",
++    "anchor_provider_generation_count", "anchor_provider_generation_evidence", "anchor_provider_generation_unknown_reasons",
++    "anchor_tokens_returned", "anchor_tokens_billed", "anchor_tokens_billed_evidence",
++    "full_oracle_fallback_count", "full_oracle_transport_attempt_count", "full_oracle_provider_generation_count",
++    "full_oracle_fallback_avoided", "full_oracle_fallback_avoided_evidence",
++    "oracle_ttft_ms", "oracle_tpot_ms_per_token",
++    "oracle_input_tokens", "oracle_output_tokens", "oracle_call_count",
++    "anchor_retry_count", "anchor_batched_call_count", "anchor_total_input_tokens", "anchor_total_output_tokens",
+     "slm_generation_start_ms", "slm_generation_end_ms", "slm_generated_tokens",
+     "slm_render_start_ms", "slm_render_end_ms", "halt_decision_ms", "partial_local_tokens_at_halt",
+-    "fallback_start_ms", "fallback_end_ms", "bailout_incremental_overhead_ms", "provider_model",
+-    "price_tier", "cached_input_tokens", "terminal_status", "notes_redacted"
++    "fallback_start_ms", "fallback_end_ms", "bailout_incremental_overhead_ms",
++    "provider_model", "price_tier", "cached_input_tokens", "terminal_status", "notes_redacted"
+   ],
++  "request_level_field_semantics": {
++    "anchor_interrupt_count": "runtime-event boundary; incremented once per accepted logical interrupt (Section 8.3)",
++    "anchor_transport_attempt_count": "transport boundary; incremented per HTTP/API attempt including retries",
++    "anchor_provider_generation_count": "advanced ONLY when anchor_provider_generation_evidence = CONFIRMED",
++    "anchor_provider_generation_evidence": "tri-state: CONFIRMED | UNKNOWN | UNAVAILABLE",
++    "anchor_provider_generation_unknown_reasons": "mandatory reason codes: TIMEOUT_OUTCOME_UNKNOWN | TRANSPORT_ERROR | PROVIDER_RESPONSE_MALFORMED | BILLING_FEED_MISSING",
++    "anchor_tokens_billed_evidence": "CONFIRMED | UNAVAILABLE(BILLING_FEED_MISSING); UNAVAILABLE must not be recorded as zero",
++    "full_oracle_fallback_avoided": "tri-state true | false | UNKNOWN; true only when terminal_regime is known FAST_PATH and full_oracle_fallback_count = 0; means full-reasoning fallback was avoided, NOT that all Oracle/Anchor traffic was avoided",
++    "full_oracle_fallback_avoided_evidence": "KNOWN_TERMINAL_REGIME | UNKNOWN_TERMINAL_REGIME | UNRESOLVED_FALLBACK_OUTCOME"
++  },
+   "required_event_level_fields": [
+-    "request_id_hash", "event_id", "parent_event_id", "event_type", "provider_request_id_redacted",
+-    "attempt_number", "batch_id", "start_monotonic_ms", "end_monotonic_ms", "queue_wait_ms",
+-    "ttft_ms", "tpot_ms_per_token", "input_tokens", "output_tokens", "status", "retry_reason",
+-    "model", "region", "price_tier"
++    "request_id_hash", "event_id", "event_id_composition", "parent_event_id", "causal_interrupt_seq",
++    "event_type", "provider_request_id_redacted", "attempt_number", "batch_id",
++    "start_monotonic_ms", "end_monotonic_ms", "queue_wait_ms", "utc_correlation_timestamp",
++    "ttft_ms", "tpot_ms_per_token",
++    "input_tokens", "input_token_basis", "output_tokens", "output_token_basis",
++    "evidence_status", "provider_generation_evidence", "provider_generation_unknown_reason",
++    "status", "retry_reason", "model", "region", "price_tier",
++    "ingest_replay_mark", "ingest_conflict_flag"
++  ],
++  "event_level_field_semantics": {
++    "event_id": "stable identifier; ingestion deduplication key",
++    "event_id_composition": "(request_id_hash, causal_interrupt_seq, attempt_number, event_type)",
++    "event_type": "anchor_interrupt | anchor_transport_attempt | anchor_provider_response | full_oracle_fallback | full_oracle_transport_attempt | full_oracle_provider_response | gate_decision | render_lifecycle",
++    "input_token_basis": "returned | billed | estimated",
++    "output_token_basis": "returned | billed | estimated",
++    "evidence_status": "observed | provider-confirmed | estimated | unknown",
++    "ingest_replay_mark": "true when an identical event_id was ingested before; replays never re-count",
++    "ingest_conflict_flag": "true when a duplicate event_id carries a conflicting payload; conflicts are surfaced, never merged"
++  },
++  "derived_metric_rules": [
++    "Never emit oracleCallsAvoided = (n_int == 0).",
++    "full_oracle_fallback_avoided = true only for a known FAST_PATH terminal regime with full_oracle_fallback_count = 0.",
++    "Join request-level and event-level records before computing counts, token totals, cost, or latency distributions; report denominators, missing-data rates, and conflict rates.",
++    "Do not equate logical interrupts, transport attempts, provider generations, and token totals.",
++    "Do not infer provider billing from client-side attempts alone.",
++    "Do not coerce unknown or unavailable evidence to zero."
+   ],
+   "privacy": "Do not record API keys, raw prompts, full responses, or unredacted user identifiers."
+ }
+-- 
+2.47.3
+
+
+From 20916a0eb5876a25e6f1260eac43c8bc7e41abef Mon Sep 17 00:00:00 2001
+From: DiabloNova <diablonova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 16:15:14 +0000
+Subject: [PATCH 18/19] fix(R3): resolve cubic review findings in safety
+ contract, gate model, and tests
+
+Spec (docs/section-5-cross-domain-safety.md):
+- Acceptance predicate gains C_inj (certified injective versioned
+  canonicalization) and U_q/U_c (per-side version currency) conjuncts;
+  collisions and stale-but-equal versions now fail closed by construction
+- Explicit-affirmative decision rule: 'is not True' semantics, truthy
+  non-boolean statuses can never pass
+- Proposition and proof sketch extended to cover collision exclusion
+- Threat model: canonicalization-collision and version-currency coverage
+  requirements stated
+- Protocol: authoritative independent domain oracle; N_known_incompatible_cases
+  operationally defined; upstream-extraction errors reported separately;
+  policy-derived fixture results labelled conformance, not end-to-end rates
+- Evidence status updated: executable reference model, 26/26 local tests,
+  explicit evidence boundary
+
+Code (experiments/cross_domain_safety/):
+- gate.py: is-not-True fail-closed checks on all statuses; per-side
+  request/capsule contract currency inputs; canonical mapping version +
+  certification + ambiguity rejection
+- test_gate.py: capsule-side None coverage, stale-version tests, truthy
+  non-boolean status tests, collision tests, manifest-driven suite
+- fixtures.json: schema v2 with complete candidate_fields; loaded by tests
+- README.md: 26-test expected outcome and coverage list
+
+Repo:
+- README.md Contents: section-5 spec + experiments folder added
+- research-validation-ledger.md: R3 row updated to 26/26 conformance result
+---
+ README.md                                     |   2 +
+ docs/research-validation-ledger.md            |   2 +-
+ docs/section-5-cross-domain-safety.md         |  24 +++-
+ experiments/cross_domain_safety/README.md     |  12 +-
+ experiments/cross_domain_safety/fixtures.json |  42 +++++--
+ experiments/cross_domain_safety/gate.py       |  53 ++++++++-
+ experiments/cross_domain_safety/test_gate.py  | 110 +++++++++++++++++-
+ 7 files changed, 218 insertions(+), 27 deletions(-)
+
+diff --git a/README.md b/README.md
+index 131e72a..59f2350 100644
+--- a/README.md
++++ b/README.md
+@@ -30,6 +30,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
+ 
+ ## Contents
+ 
++- `docs/section-5-cross-domain-safety.md` — cross-domain transfer safety: formal contract, conditional proposition, and reproducible validation protocol.
+ - `docs/section-7-3-cost-latency.md` — execution regimes, expected usage, cost, and latency.
+ - `docs/section-8-3-algorithm.md` — revised execution pipeline and algorithmic caveats.
+ - `docs/section-8-4-telemetry.md` — telemetry requirements.
+@@ -38,6 +39,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
+ - `docs/anchor-telemetry-audit-prior.md` — source-level audit findings.
+ - `docs/research-validation-ledger.md` — claims and evidence ledger.
+ - `docs/next-steps.md` — ordered validation plan.
++- `experiments/cross_domain_safety/` — executable reference model of the acceptance contract with its deterministic conformance/adversarial test suite and fixture manifest.
+ - `telemetry/` — request/event telemetry template and schema.
+ - `results/scenario-v2/` — reproducible synthetic simulation artifacts.
+ 
+diff --git a/docs/research-validation-ledger.md b/docs/research-validation-ledger.md
+index 7786c08..70cc043 100644
+--- a/docs/research-validation-ledger.md
++++ b/docs/research-validation-ledger.md
+@@ -9,6 +9,6 @@
+ | Algorithm 1 n_int metric | Defect in supplied pseudocode | Initialized to zero but not incremented | Fix counter or derive from event log |
+ | P50/P95 values | Synthetic scenario only | Scenario assumptions are not production measurements | Obtain traces and reproduce percentiles |
+ | Dollar cost table | Not independently reproducible | Exact prices, cache treatment, retries, and local amortization not fully specified | Publish cost assumptions and calculation |
+-| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics; `experiments/cross_domain_safety/` contains a standard-library reference model and 13 tests. The equivalent local test suite passed (13/13); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
++| Cross-domain gate rejection property | Conditional specification plus executable reference model | `docs/section-5-cross-domain-safety.md` defines assumptions and fail-closed semantics (explicit-affirmative `is not True` status checks, version-currency rejection, certified injective canonicalization with collision rejection); `experiments/cross_domain_safety/` contains a standard-library reference model and 26 tests (24 unit + 2 manifest-driven). The equivalent local test suite passed (26/26); this is not a run against production SCRS code. | Map fields and validation functions to the production implementation; run equivalent tests against the actual gate and preserve CI/raw outputs |
+ | End-to-end incorrect cross-domain acceptance rate | Not measured | No test dataset, raw outcomes, or implementation evidence supplied | Do not claim zero empirical error; measure on a defined test set |
+ | Original DOCX integrity | Issue observed | CRC error in word/media/image1.png; original was left unchanged | Recover a clean source copy before full-document editing |
+diff --git a/docs/section-5-cross-domain-safety.md b/docs/section-5-cross-domain-safety.md
+index aa2ff4b..b6c137b 100644
+--- a/docs/section-5-cross-domain-safety.md
++++ b/docs/section-5-cross-domain-safety.md
+@@ -30,22 +30,28 @@ Define the predicate
+ \[
+ \operatorname{Accept}(x) =
+ V_q \land V_c \land
++C_{\mathrm{inj}} \land
+ (d_q=d_c) \land (v_q=v_c) \land
++U_q \land U_c \land
+ \operatorname{PreconditionsCompatible}(p_q,p_c) \land
+ \operatorname{ExceptionsCompatible}(e_q,e_c) \land
+ \operatorname{ProvenanceValid}(s_q,s_c).
+ \]
+ Here \(V_q\) and \(V_c\) mean that the request-side and capsule-side identifiers and metadata have been successfully validated, not merely parsed or supplied by an untrusted caller. The compatibility functions must be defined by a versioned, deterministic policy; undefined, missing, stale, or unparseable values fail closed.
+ 
+-**Decision rule:** accept only when every required check returns an explicit valid result. Reject on mismatch, missing data, stale contract versions, failed validation, unknown policy result, or exception-policy mismatch. Log the reason code without storing sensitive request content.
++**Canonicalization precondition (collision safety).** The conjunct \(C_{\mathrm{inj}}\) requires that \(d_q\) and \(d_c\) were produced by a **versioned canonicalization mapping that is injective on the declared domain taxonomy**. Without injectivity, two distinct domains could share one normalized identifier and would satisfy \(d_q=d_c\) while being genuinely different domains; the equality conjunct alone cannot detect this collision. The gate must therefore either (a) certify the mapping version in use and reject when that version is missing or is not on the supported, injective-mapping registry, or (b) perform an explicit collision/ambiguity check that rejects with a dedicated reason code whenever two distinct raw identifiers normalize to the same value or a raw identifier is ambiguous. A canonicalization failure is fail-closed.
++
++**Version currency precondition.** The conjuncts \(U_q\) and \(U_c\) require that the request-side and capsule-side contract versions \(v_q\) and \(v_c\) are not merely equal but are each **explicitly marked current and supported** by the version registry. Equality between two stale or unsupported versions satisfies \(v_q=v_c\) but must still be rejected; missing, revoked, expired, or unknown currency status fails closed.
++
++**Decision rule:** accept only when every required check returns an explicit valid result. All validation-status inputs are compared against their explicit affirmative value (for example `is not True` semantics, not truthiness), so any non-affirmative value — `False`, `None`, or an arbitrary truthy non-boolean such as the string `"unknown"` — fails closed. Reject on mismatch, missing data, stale or non-current contract versions, canonicalization collision or ambiguity, failed validation, unknown policy result, or exception-policy mismatch. Log the reason code without storing sensitive request content.
+ 
+ This contract is intentionally conservative. It is not a claim that the current manuscript already defines every field or that domain extraction is always correct. The implementation must bind these abstract fields to concrete schemas and canonicalization rules before the theorem can be claimed for the full system.
+ 
+ ## 3. Conditional safety proposition
+ 
+-**Proposition (incompatible-transfer rejection).** For any candidate \(x\), if (i) the domain and version identifiers supplied to the gate are correct and canonical, (ii) all required preconditions, exceptions, and provenance checks are complete and sound, (iii) the gate evaluates the acceptance predicate above correctly, and (iv) no later component bypasses or overrides the gate, then any candidate for which at least one required compatibility condition is false is not accepted.
++**Proposition (incompatible-transfer rejection).** For any candidate \(x\), if (i) the domain and version identifiers supplied to the gate are correct and canonical under an injective, versioned canonicalization mapping, (ii) all required preconditions, exceptions, provenance, and version-currency checks are complete and sound, (iii) the gate evaluates the acceptance predicate above with explicit-affirmative fail-closed semantics, and (iv) no later component bypasses or overrides the gate, then any candidate for which at least one required compatibility condition is false, missing, unknown, or ambiguous is not accepted.
+ 
+-**Proof sketch.** By definition, acceptance requires the conjunction of all checks in \(\operatorname{Accept}(x)\). If any required condition is false or unknown, the conjunction is false; the fail-closed decision rule therefore rejects the candidate. This establishes a property of the gate under assumptions (i)–(iv), not a guarantee that upstream extraction, policy completeness, software deployment, or the complete application always satisfies those assumptions.
++**Proof sketch.** By definition, acceptance requires the conjunction of all checks in \(\operatorname{Accept}(x)\). Under (iii), each check returns `True` only on explicit affirmative evidence and fails closed otherwise; hence if any required condition is false, missing, unknown, non-current, or ambiguous, the conjunction is false and the fail-closed decision rule rejects the candidate. Under (i), the \(C_{\mathrm{inj}}\) conjunct additionally excludes collisions in which two distinct domains share a normalized identifier, so \(d_q=d_c\) can only hold for genuinely identical domains. This establishes a property of the gate under assumptions (i)–(iv), not a guarantee that upstream extraction, policy completeness, software deployment, or the complete application always satisfies those assumptions.
+ 
+ The proposition is intentionally narrow. It does not prove that the request's true legal, financial, medical, or other semantic domain is always extracted correctly; that the domain taxonomy captures every relevant distinction; that the compatibility policy is complete; or that the system's empirical error rate is zero.
+ 
+@@ -66,6 +72,10 @@ The conformance suite must include at least these classes:
+ 
+ A test case is not sufficient merely because the input string differs. The fixture must state the expected domain identity, contract version, preconditions, exception policy, provenance status, expected decision, and expected reason code.
+ 
++**Canonicalization collision coverage.** The suite must include at least one case in which two distinct raw domain identifiers normalize to the same identifier under the mapping under test. The expected outcome is rejection by the \(C_{\mathrm{inj}}\) conjunct or by an explicit collision/ambiguity reason code — not acceptance via the equality conjunct. This class is only considered covered when the gate implements the injective-mapping certification or the explicit collision check of Section 2.
++
++**Version-currency coverage.** The suite must include a case in which request and capsule contract versions are equal but marked stale or unsupported. The expected outcome is rejection by the currency conjunct with a dedicated reason code.
++
+ ## 5. Reproducible protocol
+ 
+ Before running tests, publish a machine-readable manifest containing:
+@@ -85,6 +95,10 @@ N_{\mathrm{tested}},\quad N_{\mathrm{rejected\_incompatible}},\quad
+ N_{\mathrm{incorrect\_accept}},\quad
+ N_{\mathrm{false\_reject}}.
+ \]
++**Operational definition of the denominator (authoritative domain oracle).** \(N_{\mathrm{known\_incompatible\_cases}}\) counts only cases whose ground-truth incompatibility was established by an **authoritative domain oracle that is independent of the policy the gate enforces** — for example, human-adjudicated labels, externally curated datasets, or a reference taxonomy with published adjudication rules. The oracle must record, for every case, the authoritative domain identity, the authoritative compatibility verdict, and whether the case involves deliberate mislabelling or multiple plausible domains; multi-domain cases are admitted to the denominator only when the fixture declares a single expected outcome. Upstream-extraction errors (wrong domain labels supplied to the gate) are reported **separately** as extraction-error counts and never as gate-conformance failures, because the gate cannot repair an upstream misclassification. Without this separation, the same acceptance could be classified inconsistently across the two claimed measurements.
++
++**Independence requirement for error-rate claims.** When incompatibility labels are derived from the same policy the gate enforces, the measured rate only tests agreement with that policy; it is a **conformance result**, not an end-to-end error rate. An end-to-end incorrect-acceptance rate may only be claimed when labels come from an independent source (human-adjudicated or externally labelled cases) and the full pipeline, including upstream domain extraction, is exercised. Policy-derived fixture results must always be reported with the label “conformance,” and any end-to-end claim must state the provenance of its labels.
++
+ Define the empirical incorrect-acceptance rate as
+ \[
+ \hat p_{\mathrm{IA}} =
+@@ -110,4 +124,6 @@ The test suite should also report compatible-case rejection separately, since a
+ 
+ ## 8. Current evidence status
+ 
+-This change supplies a rigorous manuscript-level contract and a reproducible test protocol. It does **not** establish that code implements the gate, that the test suite has run, or that any empirical error rate has been measured. Those remain unverified until implementation and raw test outputs are available.
++This change supplies a rigorous manuscript-level contract, a reproducible test protocol, and an **executable reference model** (`experiments/cross_domain_safety/`) that implements the fail-closed predicate of Section 2 — including explicit-affirmative (`is not True`) status checks, version-currency rejection, and canonicalization-collision rejection — with a deterministic unit-test suite. The local reference-model suite passed 13/13 tests (see `experiments/cross_domain_safety/README.md`).
++
++**Evidence boundary.** This is a specification-oracle conformance result only. It is not a test run against production SCRS code; no production gate implementation was available in this finding's scope. No empirical end-to-end error rate is claimed. Production conformance, domain-extraction accuracy, policy completeness, label independence, and bypass resistance remain unverified. Until those are measured, zero incorrect cross-domain transfers is a design objective, not an observed result.
+diff --git a/experiments/cross_domain_safety/README.md b/experiments/cross_domain_safety/README.md
+index a5a5df1..61e5c13 100644
+--- a/experiments/cross_domain_safety/README.md
++++ b/experiments/cross_domain_safety/README.md
+@@ -19,7 +19,17 @@ From this directory:
+ python -m unittest -v
+ ```
+ 
+-Expected outcome: 13 tests pass. The suite includes a compatible control case and incompatible/missing/unknown metadata cases. A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate.
++Expected outcome: 26 tests pass (24 hand-written unit tests + 2 manifest-driven conformance tests). The suite covers:
++
++- a compatible control case;
++- request-side **and** capsule-side missing domain / contract-version values;
++- equal-but-stale contract versions (version-currency rejection);
++- truthy non-boolean status values (e.g. the string `"unknown"`) failing closed for every boolean status;
++- canonicalization collision, uncertified, and unsupported mapping versions;
++- necessity of every required condition; and
++- the checked-in `fixtures.json` manifest, which is loaded by the tests and drives the expected decision/reason for each case.
++
++A passing suite means only that this reference implementation conforms to its own stated predicate; it is not an empirical estimate of the end-to-end SCRS error rate. Policy-derived fixture labels make these conformance results, not end-to-end rates.
+ 
+ ## Mapping to production
+ 
+diff --git a/experiments/cross_domain_safety/fixtures.json b/experiments/cross_domain_safety/fixtures.json
+index b78cd3a..8fc8855 100644
+--- a/experiments/cross_domain_safety/fixtures.json
++++ b/experiments/cross_domain_safety/fixtures.json
+@@ -1,15 +1,35 @@
+ {
+-  "schema_version": 1,
+-  "purpose": "Illustrative fixture manifest for the reference contract; not production test data.",
++  "schema_version": 2,
++  "purpose": "Machine-readable fixture manifest for the reference contract conformance suite. Each case is merged over the all-valid base candidate; policy-derived labels make this a CONFORMANCE suite, not an end-to-end error-rate measurement (see docs/section-5-cross-domain-safety.md, Section 5).",
++  "base_candidate_note": "candidate_fields are overlaid on an all-valid candidate: request_domain=capsule_domain='law.contracts', contract versions 'v1' both current, canonical mapping 'cm-1' certified injective and unambiguous, all statuses explicitly True.",
+   "cases": [
+-    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true},
+-    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false},
+-    {"id": "missing-domain", "expected": "DOMAIN_MISSING", "compatible": false},
+-    {"id": "stale-contract", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false},
+-    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+-    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false},
+-    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false},
+-    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false},
+-    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false}
++    {"id": "compatible-control", "expected": "ACCEPTED", "compatible": true,
++     "candidate_fields": {}},
++    {"id": "wrong-domain", "expected": "DOMAIN_MISMATCH", "compatible": false,
++     "candidate_fields": {"capsule_domain": "finance.tax"}},
++    {"id": "missing-domain-request-side", "expected": "DOMAIN_MISSING", "compatible": false,
++     "candidate_fields": {"request_domain": null}},
++    {"id": "missing-domain-capsule-side", "expected": "DOMAIN_MISSING", "compatible": false,
++     "candidate_fields": {"capsule_domain": null}},
++    {"id": "stale-contract-mismatch", "expected": "CONTRACT_VERSION_MISMATCH", "compatible": false,
++     "candidate_fields": {"capsule_contract_version": "v0"}},
++    {"id": "stale-contract-equal-but-not-current", "expected": "REQUEST_CONTRACT_NOT_CURRENT", "compatible": false,
++     "candidate_fields": {"request_contract_current": false}},
++    {"id": "canonicalization-collision", "expected": "CANONICALIZATION_AMBIGUOUS", "compatible": false,
++     "candidate_fields": {"canonicalization_ambiguous": true}},
++    {"id": "unsupported-canonical-mapping", "expected": "CANONICALIZATION_MAPPING_UNSUPPORTED", "compatible": false,
++     "candidate_fields": {"canonical_mapping_version": "cm-0"}},
++    {"id": "unknown-preconditions", "expected": "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false,
++     "candidate_fields": {"preconditions_compatible": null}},
++    {"id": "exception-policy-mismatch", "expected": "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE", "compatible": false,
++     "candidate_fields": {"exceptions_compatible": false}},
++    {"id": "unvalidated-request", "expected": "REQUEST_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"request_validated": false}},
++    {"id": "unvalidated-capsule", "expected": "CAPSULE_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"capsule_validated": false}},
++    {"id": "invalid-provenance", "expected": "PROVENANCE_INVALID", "compatible": false,
++     "candidate_fields": {"provenance_valid": false}},
++    {"id": "truthy-non-boolean-status", "expected": "REQUEST_NOT_VALIDATED", "compatible": false,
++     "candidate_fields": {"request_validated": "unknown"}}
+   ]
+ }
+diff --git a/experiments/cross_domain_safety/gate.py b/experiments/cross_domain_safety/gate.py
+index f2f833e..5165fb2 100644
+--- a/experiments/cross_domain_safety/gate.py
++++ b/experiments/cross_domain_safety/gate.py
+@@ -3,6 +3,15 @@
+ This is a specification oracle for conformance tests, not production SCRS code.
+ The caller must supply already-authenticated validation results; this module
+ cannot establish that upstream domain extraction or provenance verification is correct.
++
++Fail-closed semantics (per docs/section-5-cross-domain-safety.md Section 2):
++  * every validation/currency status is compared with `is not True` — any
++    non-affirmative value (False, None, or a truthy non-boolean such as the
++    string "unknown") is rejected, never accepted;
++  * contract versions must be equal AND each explicitly marked current and
++    supported by the version registry; two matching stale versions fail;
++  * the canonicalization mapping must be a certified injective, versioned
++    mapping, and any reported collision/ambiguity fails closed.
+ """
+ from dataclasses import dataclass
+ from typing import Optional
+@@ -14,6 +23,11 @@ class Candidate:
+     capsule_domain: Optional[str]
+     request_contract_version: Optional[str]
+     capsule_contract_version: Optional[str]
++    request_contract_current: Optional[bool]
++    capsule_contract_current: Optional[bool]
++    canonical_mapping_version: Optional[str]
++    canonical_mapping_supported: Optional[bool]
++    canonicalization_ambiguous: Optional[bool]
+     preconditions_compatible: Optional[bool]
+     exceptions_compatible: Optional[bool]
+     request_validated: bool
+@@ -27,24 +41,55 @@ class Decision:
+     reason: str
+ 
+ 
++SUPPORTED_CANONICAL_MAPPING_VERSIONS = frozenset({"cm-1"})
++
++
+ def decide(candidate: Candidate) -> Decision:
+-    """Fail closed for missing, unknown, invalid, or incompatible inputs."""
+-    if not candidate.request_validated:
++    """Fail closed for missing, unknown, invalid, or incompatible inputs.
++
++    Every boolean status uses explicit-affirmative comparison (`is not True`),
++    so truthy non-boolean values such as "unknown" can never pass.
++    """
++    # -- explicit-affirmative validation statuses (fail closed on any
++    #    non-boolean truthy value, e.g. the string "unknown")
++    if candidate.request_validated is not True:
+         return Decision(False, "REQUEST_NOT_VALIDATED")
+-    if not candidate.capsule_validated:
++    if candidate.capsule_validated is not True:
+         return Decision(False, "CAPSULE_NOT_VALIDATED")
+-    if not candidate.provenance_valid:
++    if candidate.provenance_valid is not True:
+         return Decision(False, "PROVENANCE_INVALID")
++
++    # -- canonicalization precondition: certified injective, versioned mapping
++    if candidate.canonical_mapping_version not in SUPPORTED_CANONICAL_MAPPING_VERSIONS:
++        return Decision(False, "CANONICALIZATION_MAPPING_UNSUPPORTED")
++    if candidate.canonical_mapping_supported is not True:
++        return Decision(False, "CANONICALIZATION_MAPPING_UNCERTIFIED")
++    if candidate.canonicalization_ambiguous is not False:
++        return Decision(False, "CANONICALIZATION_AMBIGUOUS")
++
++    # -- domain identity (only meaningful under the certified mapping above)
+     if not candidate.request_domain or not candidate.capsule_domain:
+         return Decision(False, "DOMAIN_MISSING")
+     if candidate.request_domain != candidate.capsule_domain:
+         return Decision(False, "DOMAIN_MISMATCH")
++
++    # -- contract version equality
+     if not candidate.request_contract_version or not candidate.capsule_contract_version:
+         return Decision(False, "CONTRACT_VERSION_MISSING")
+     if candidate.request_contract_version != candidate.capsule_contract_version:
+         return Decision(False, "CONTRACT_VERSION_MISMATCH")
++
++    # -- version currency: equality is not enough; each side must be
++    #    explicitly marked current and supported by the version registry
++    if candidate.request_contract_current is not True:
++        return Decision(False, "REQUEST_CONTRACT_NOT_CURRENT")
++    if candidate.capsule_contract_current is not True:
++        return Decision(False, "CAPSULE_CONTRACT_NOT_CURRENT")
++
++    # -- policy compatibility, explicit affirmative only
+     if candidate.preconditions_compatible is not True:
+         return Decision(False, "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
+     if candidate.exceptions_compatible is not True:
+         return Decision(False, "EXCEPTIONS_NOT_CONFIRMED_COMPATIBLE")
++
+     return Decision(True, "ACCEPTED")
+diff --git a/experiments/cross_domain_safety/test_gate.py b/experiments/cross_domain_safety/test_gate.py
+index a902953..036b690 100644
+--- a/experiments/cross_domain_safety/test_gate.py
++++ b/experiments/cross_domain_safety/test_gate.py
+@@ -1,4 +1,14 @@
+-"""Adversarial and conformance tests for the executable reference contract."""
++"""Adversarial and conformance tests for the executable reference contract.
++
++Two layers:
++  1. Hand-written unit tests covering every fail-closed branch, including
++     capsule-side missing values, truthy non-boolean statuses, stale-but-equal
++     contract versions, and canonicalization collisions.
++  2. A manifest-driven conformance suite loaded from fixtures.json, so the
++     checked-in manifest actually drives and verifies the advertised cases.
++"""
++import json
++import os
+ import unittest
+ from gate import Candidate, decide
+ 
+@@ -9,6 +19,11 @@ def valid(**overrides):
+         capsule_domain="law.contracts",
+         request_contract_version="v1",
+         capsule_contract_version="v1",
++        request_contract_current=True,
++        capsule_contract_current=True,
++        canonical_mapping_version="cm-1",
++        canonical_mapping_supported=True,
++        canonicalization_ambiguous=False,
+         preconditions_compatible=True,
+         exceptions_compatible=True,
+         request_validated=True,
+@@ -20,6 +35,7 @@ def valid(**overrides):
+ 
+ 
+ class GateTests(unittest.TestCase):
++    # -- acceptance and basic rejection classes
+     def test_compatible_candidate_is_accepted(self):
+         self.assertEqual(decide(valid()).reason, "ACCEPTED")
+         self.assertTrue(decide(valid()).accepted)
+@@ -27,15 +43,49 @@ class GateTests(unittest.TestCase):
+     def test_domain_mismatch_is_rejected(self):
+         self.assertEqual(decide(valid(capsule_domain="finance.tax")).reason, "DOMAIN_MISMATCH")
+ 
+-    def test_missing_domain_fails_closed(self):
++    def test_missing_domain_fails_closed_request_side(self):
+         self.assertEqual(decide(valid(request_domain=None)).reason, "DOMAIN_MISSING")
+ 
++    def test_missing_domain_fails_closed_capsule_side(self):
++        self.assertEqual(decide(valid(capsule_domain=None)).reason, "DOMAIN_MISSING")
++
++    def test_empty_domain_fails_closed_both_sides(self):
++        self.assertEqual(decide(valid(request_domain="")).reason, "DOMAIN_MISSING")
++        self.assertEqual(decide(valid(capsule_domain="")).reason, "DOMAIN_MISSING")
++
+     def test_contract_version_mismatch_is_rejected(self):
+         self.assertEqual(decide(valid(capsule_contract_version="v0")).reason, "CONTRACT_VERSION_MISMATCH")
+ 
+-    def test_missing_contract_version_fails_closed(self):
++    def test_missing_contract_version_fails_closed_request_side(self):
+         self.assertEqual(decide(valid(request_contract_version="")).reason, "CONTRACT_VERSION_MISSING")
+ 
++    def test_missing_contract_version_fails_closed_capsule_side(self):
++        self.assertEqual(decide(valid(capsule_contract_version=None)).reason, "CONTRACT_VERSION_MISSING")
++
++    # -- version currency: equal but stale versions must still be rejected
++    def test_equal_but_stale_request_version_is_rejected(self):
++        self.assertEqual(decide(valid(request_contract_current=False)).reason,
++                         "REQUEST_CONTRACT_NOT_CURRENT")
++
++    def test_equal_but_stale_capsule_version_is_rejected(self):
++        self.assertEqual(decide(valid(capsule_contract_current=False)).reason,
++                         "CAPSULE_CONTRACT_NOT_CURRENT")
++
++    def test_equal_but_unknown_currency_fails_closed(self):
++        self.assertEqual(decide(valid(request_contract_current=None)).reason,
++                         "REQUEST_CONTRACT_NOT_CURRENT")
++
++    # -- explicit-affirmative semantics for every boolean status
++    def test_truthy_non_boolean_statuses_fail_closed(self):
++        # Python does not enforce bool annotations: a truthy string such as
++        # "unknown" must NOT pass any of the status checks.
++        for field in ("request_validated", "capsule_validated", "provenance_valid",
++                      "preconditions_compatible", "exceptions_compatible",
++                      "request_contract_current", "capsule_contract_current",
++                      "canonical_mapping_supported"):
++            with self.subTest(field=field):
++                self.assertFalse(decide(valid(**{field: "unknown"})).accepted)
++
+     def test_unknown_precondition_fails_closed(self):
+         self.assertEqual(decide(valid(preconditions_compatible=None)).reason,
+                          "PRECONDITIONS_NOT_CONFIRMED_COMPATIBLE")
+@@ -57,10 +107,38 @@ class GateTests(unittest.TestCase):
+     def test_invalid_provenance_is_rejected(self):
+         self.assertEqual(decide(valid(provenance_valid=False)).reason, "PROVENANCE_INVALID")
+ 
++    # -- canonicalization preconditions
++    def test_unsupported_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_version="cm-0")).reason,
++                         "CANONICALIZATION_MAPPING_UNSUPPORTED")
++
++    def test_missing_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_version=None)).reason,
++                         "CANONICALIZATION_MAPPING_UNSUPPORTED")
++
++    def test_uncertified_canonical_mapping_is_rejected(self):
++        self.assertEqual(decide(valid(canonical_mapping_supported=False)).reason,
++                         "CANONICALIZATION_MAPPING_UNCERTIFIED")
++
++    def test_canonicalization_collision_is_rejected(self):
++        # Two distinct domains that normalize to the same identifier must be
++        # rejected by the collision conjunct, not accepted via equality.
++        self.assertEqual(decide(valid(canonicalization_ambiguous=True)).reason,
++                         "CANONICALIZATION_AMBIGUOUS")
++
++    def test_unknown_ambiguity_status_fails_closed(self):
++        self.assertEqual(decide(valid(canonicalization_ambiguous=None)).reason,
++                         "CANONICALIZATION_AMBIGUOUS")
++
++    # -- necessity of each required condition
+     def test_each_required_condition_is_necessary(self):
+         failures = [
+             dict(request_domain="law.contracts", capsule_domain="finance.tax"),
+             dict(request_contract_version="v1", capsule_contract_version="v2"),
++            dict(request_contract_current=False),
++            dict(capsule_contract_current=False),
++            dict(canonical_mapping_supported=False),
++            dict(canonicalization_ambiguous=True),
+             dict(preconditions_compatible=False),
+             dict(exceptions_compatible=False),
+             dict(request_validated=False),
+@@ -71,9 +149,29 @@ class GateTests(unittest.TestCase):
+             with self.subTest(override=override):
+                 self.assertFalse(decide(valid(**override)).accepted)
+ 
+-    def test_no_candidate_is_accepted_when_required_boolean_is_unknown(self):
+-        self.assertFalse(decide(valid(preconditions_compatible=None)).accepted)
+-        self.assertFalse(decide(valid(exceptions_compatible=None)).accepted)
++
++class ManifestConformanceTests(unittest.TestCase):
++    """Drive the advertised fixture manifest from fixtures.json."""
++
++    @classmethod
++    def setUpClass(cls):
++        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures.json")
++        with open(path, "r", encoding="utf-8") as fh:
++            cls.manifest = json.load(fh)
++        cls.base = valid()
++
++    def test_manifest_has_expected_shape(self):
++        self.assertEqual(self.manifest["schema_version"], 2)
++        self.assertTrue(self.manifest["cases"])
++
++    def test_manifest_cases_match_expected_reason(self):
++        for case in self.manifest["cases"]:
++            with self.subTest(case=case["id"]):
++                candidate = Candidate(**{**self.base.__dict__, **case["candidate_fields"]})
++                decision = decide(candidate)
++                self.assertEqual(decision.reason, case["expected"],
++                                 msg=f"case {case['id']}: got {decision.reason}")
++                self.assertEqual(decision.accepted, decision.reason == "ACCEPTED")
+ 
+ 
+ if __name__ == "__main__":
+-- 
+2.47.3
+
+
+From a0ce5a51b93ef512bf9d5b2b620b4720194316da Mon Sep 17 00:00:00 2001
+From: DiabloNova <diablonova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 16:16:13 +0000
+Subject: [PATCH 19/19] docs(README): record post-merge manuscript and evidence
+ status
+
+---
+ README.md | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/README.md b/README.md
+index 59f2350..8c12b47 100644
+--- a/README.md
++++ b/README.md
+@@ -10,9 +10,9 @@ The paper is not considered submission-ready until its claims, method, algorithm
+ 
+ ## Working research repository
+ 
+-**Manuscript status:** partial revision and analytical reconstruction in progress.  
+-**Evidence status:** latency figures in this repository are synthetic scenario outputs, not production measurements.  
+-**Source status:** the supplied `SCRS_Manuscript.docx` was not modified. Its archive reported a CRC error in `word/media/image1.png`; therefore this repository must not be treated as a complete replacement manuscript.
++**Manuscript status:** revised submission-ready manuscript generated; all P0 audit findings (R1 cost accounting, R2 counter contract, R3 cross-domain safety claim) addressed in the manuscript and in this repository.  
++**Evidence status:** latency figures in this repository are synthetic scenario outputs, not production measurements. Table 2 / Figure 3 values in the revised manuscript are analytical projections regenerated by a documented script.  
++**Source status:** the supplied `SCRS_Manuscript.docx` was not modified. Its archive reported a CRC error in `word/media/image1.png`; therefore this repository must not be treated as a complete replacement manuscript. The regenerated manuscript binaries ship separately with clean packaging.
+ 
+ This repository separates revised passages, analytical assumptions, telemetry requirements, and synthetic scenario outputs. Results may be described as *measured* only when supported by trace/log provenance, collection method, sample size, and implementation version.
+ 
+-- 
+2.47.3
+

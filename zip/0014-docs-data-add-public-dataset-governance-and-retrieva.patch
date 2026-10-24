@@ -1,0 +1,43 @@
+From 452696b0742737a0ab022ff6f9c88716a7d201a0 Mon Sep 17 00:00:00 2001
+From: DiabloNova <121438027+DiabloNova@users.noreply.github.com>
+Date: Fri, 23 Oct 2026 19:18:10 +0330
+Subject: [PATCH 14/19] docs(data): add public dataset governance and retrieval
+ policy
+
+---
+ data/README.md | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 data/README.md
+
+diff --git a/data/README.md b/data/README.md
+new file mode 100644
+index 0000000..e2d5a9f
+--- /dev/null
++++ b/data/README.md
+@@ -0,0 +1,23 @@
++# Data and evaluation assets
++
++This directory holds dataset manifests, small original fixtures, and instructions for reproducible retrieval of public benchmarks.
++
++## Data policy
++
++- Do not commit third-party datasets until their source and redistribution licence have been checked.
++- Prefer canonical upstream retrieval scripts plus SHA-256 manifests for large or non-redistributable sources.
++- Keep train/development/test splits separate; never tune prompts or thresholds on the final test split.
++- Keep public-benchmark results, synthetic simulations, and real deployment measurements in separate locations and label them clearly.
++- Do not store API keys, user data, private prompts, or sensitive request logs.
++
++## Current assets
++
++- fixtures/scrs_adversarial_cases.jsonl — original, hand-authored schema examples for testing whether decision-relevant conditions survive representation changes. These are software test fixtures, not public benchmark results.
++- Public benchmark candidates and inclusion rules: docs/free-public-evidence-acquisition.md.
++
++## Next steps
++
++1. Verify licence and exact version for each chosen upstream dataset.
++2. Add a manifest with canonical URL, revision, split, licence, retrieval date, file hashes, and preprocessing version.
++3. Implement deterministic download/validation and benchmark adapters.
++4. Run baseline and SCRS variants without test-set tuning; publish machine-readable results and exact commands.
+-- 
+2.47.3
+

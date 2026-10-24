@@ -1,0 +1,31 @@
+test_canonicalization_collision_is_rejected (test_gate.GateTests.test_canonicalization_collision_is_rejected) ... ok
+test_compatible_candidate_is_accepted (test_gate.GateTests.test_compatible_candidate_is_accepted) ... ok
+test_contract_version_mismatch_is_rejected (test_gate.GateTests.test_contract_version_mismatch_is_rejected) ... ok
+test_domain_mismatch_is_rejected (test_gate.GateTests.test_domain_mismatch_is_rejected) ... ok
+test_each_required_condition_is_necessary (test_gate.GateTests.test_each_required_condition_is_necessary) ... ok
+test_empty_domain_fails_closed_both_sides (test_gate.GateTests.test_empty_domain_fails_closed_both_sides) ... ok
+test_equal_but_stale_capsule_version_is_rejected (test_gate.GateTests.test_equal_but_stale_capsule_version_is_rejected) ... ok
+test_equal_but_stale_request_version_is_rejected (test_gate.GateTests.test_equal_but_stale_request_version_is_rejected) ... ok
+test_equal_but_unknown_currency_fails_closed (test_gate.GateTests.test_equal_but_unknown_currency_fails_closed) ... ok
+test_incompatible_exception_policy_is_rejected (test_gate.GateTests.test_incompatible_exception_policy_is_rejected) ... ok
+test_invalid_provenance_is_rejected (test_gate.GateTests.test_invalid_provenance_is_rejected) ... ok
+test_missing_canonical_mapping_is_rejected (test_gate.GateTests.test_missing_canonical_mapping_is_rejected) ... ok
+test_missing_contract_version_fails_closed_capsule_side (test_gate.GateTests.test_missing_contract_version_fails_closed_capsule_side) ... ok
+test_missing_contract_version_fails_closed_request_side (test_gate.GateTests.test_missing_contract_version_fails_closed_request_side) ... ok
+test_missing_domain_fails_closed_capsule_side (test_gate.GateTests.test_missing_domain_fails_closed_capsule_side) ... ok
+test_missing_domain_fails_closed_request_side (test_gate.GateTests.test_missing_domain_fails_closed_request_side) ... ok
+test_truthy_non_boolean_statuses_fail_closed (test_gate.GateTests.test_truthy_non_boolean_statuses_fail_closed) ... ok
+test_uncertified_canonical_mapping_is_rejected (test_gate.GateTests.test_uncertified_canonical_mapping_is_rejected) ... ok
+test_unknown_ambiguity_status_fails_closed (test_gate.GateTests.test_unknown_ambiguity_status_fails_closed) ... ok
+test_unknown_exception_policy_fails_closed (test_gate.GateTests.test_unknown_exception_policy_fails_closed) ... ok
+test_unknown_precondition_fails_closed (test_gate.GateTests.test_unknown_precondition_fails_closed) ... ok
+test_unsupported_canonical_mapping_is_rejected (test_gate.GateTests.test_unsupported_canonical_mapping_is_rejected) ... ok
+test_unvalidated_capsule_is_rejected (test_gate.GateTests.test_unvalidated_capsule_is_rejected) ... ok
+test_unvalidated_request_is_rejected (test_gate.GateTests.test_unvalidated_request_is_rejected) ... ok
+test_manifest_cases_match_expected_reason (test_gate.ManifestConformanceTests.test_manifest_cases_match_expected_reason) ... ok
+test_manifest_has_expected_shape (test_gate.ManifestConformanceTests.test_manifest_has_expected_shape) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 0.001s
+
+OK
