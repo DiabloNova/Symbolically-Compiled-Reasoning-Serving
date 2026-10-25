@@ -54,7 +54,7 @@ A source inconsistency was resolved by defining `n_anchor` as calls per successf
 ## Remaining evidence gaps
 
 1. **Runtime-source blocker:** no SCRS runtime or Anchor transport client is present in the main-branch source inventory. Obtain the implementation repository/path before inferring retry, batching, cancellation, provider-generation, or billing behaviour.
-2. The new offline telemetry contract validator has 15 passing local reference tests; it does not replace runtime instrumentation or provider evidence. See `telemetry/README.md`.
+2. The new offline telemetry contract validator has 17 passing local reference tests; it does not replace runtime instrumentation or provider evidence. See `telemetry/README.md`.
 3. Reconcile provider-billed input/output tokens against actual request/event telemetry and provider-side billing exports.
 4. Run the cross-domain gate contract against the real gate and measure end-to-end false-transfer rates on independently labelled test cases.
 5. Obtain request-level traces and empirical baseline comparisons before reporting measured P50/P95 or production cost reductions.
