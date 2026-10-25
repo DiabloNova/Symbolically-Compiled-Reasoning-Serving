@@ -4,7 +4,8 @@ from telemetry.validate_telemetry import EVENT_FIELDS, REQUEST_FIELDS, validate_
 
 
 def request(rid="req-1", **overrides):
-    row = {
+    row = {field: "" for field in REQUEST_FIELDS}
+    row.update({
         "request_id_hash": rid, "terminal_regime": "FAST_PATH",
         "anchor_interrupt_count": "0", "anchor_transport_attempt_count": "0",
         "anchor_provider_generation_count": "0", "anchor_provider_generation_evidence": "CONFIRMED",
@@ -12,19 +13,20 @@ def request(rid="req-1", **overrides):
         "anchor_tokens_billed_evidence": "CONFIRMED", "full_oracle_fallback_count": "0",
         "full_oracle_transport_attempt_count": "0", "full_oracle_provider_generation_count": "0",
         "full_oracle_fallback_avoided": "TRUE", "full_oracle_fallback_avoided_evidence": "KNOWN_TERMINAL_REGIME",
-    }
+    })
     row.update(overrides)
     return row
 
 
 def event(rid="req-1", eid="e1", etype="anchor_interrupt", **overrides):
-    row = {
+    row = {field: "" for field in EVENT_FIELDS}
+    row.update({
         "request_id_hash": rid, "event_id": eid, "event_type": etype,
         "parent_event_id": "", "causal_interrupt_seq": "1", "attempt_number": "1",
         "evidence_status": "observed", "provider_generation_evidence": "",
         "provider_generation_unknown_reason": "", "status": "success",
         "ingest_replay_mark": "false", "ingest_conflict_flag": "false",
-    }
+    })
     row.update(overrides)
     return row
 
@@ -144,6 +146,15 @@ class TelemetryContractTests(unittest.TestCase):
 
     def test_fallback_avoided_true_requires_fast_path_and_zero_fallback(self):
         req = request(terminal_regime="FALLBACK", full_oracle_fallback_count="1")
+        self.assert_fail_code([req], [], "FALLBACK_AVOIDED_INCONSISTENT")
+
+    def test_known_fast_path_cannot_mark_fallback_avoided_unknown(self):
+        req = request(full_oracle_fallback_avoided="UNKNOWN",
+                      full_oracle_fallback_avoided_evidence="UNKNOWN_TERMINAL_REGIME")
+        self.assert_fail_code([req], [], "FALLBACK_AVOIDED_INCONSISTENT")
+
+    def test_fallback_terminal_requires_a_fallback_event(self):
+        req = request(terminal_regime="FALLBACK", full_oracle_fallback_avoided="FALSE")
         self.assert_fail_code([req], [], "FALLBACK_AVOIDED_INCONSISTENT")
 
     def test_orphan_event_rejected(self):
