@@ -1,6 +1,6 @@
 # SCRS telemetry contract checker
 
-validate_telemetry.py checks consistency between request-level summaries and request-linked event rows under telemetry-schema.json (schema version 2). It is an **offline reference checker**: it does not instrument or validate a production SCRS runtime or Anchor client and cannot establish real retry, batching, generation, or billing behaviour.
+validate_telemetry.py checks consistency between request-level summaries and request-linked event rows against the complete request-level and event-level column lists in telemetry-schema.json (schema version 2). It is an **offline reference checker**: it does not instrument or validate a production SCRS runtime or Anchor client and cannot establish real retry, batching, generation, or billing behaviour.
 
 ## Run the contract suite
 
@@ -10,7 +10,7 @@ From the repository root:
 python -m unittest discover -s tests -p 'test_telemetry_validation.py' -v
 \`\`\`
 
-The suite covers no-interrupt fast-path completion, multiple logical interrupts, retries, unknown timeout outcomes, a cache/admission miss followed by fallback, halt followed by fallback, identical replay deduplication, conflicting duplicate event IDs, unavailable billing, counter mismatches, missing unknown-state reason codes, and orphan events.
+The suite covers no-interrupt fast-path completion, multiple logical interrupts, retries, unknown timeout outcomes, a cache/admission miss followed by fallback, halt followed by fallback, identical replay deduplication, conflicting duplicate event IDs, unavailable billing, counter mismatches, missing unknown-state reason codes, orphan events, full schema-header validation, and terminal-regime/fallback consistency.
 
 ## Validate captured CSV records
 
