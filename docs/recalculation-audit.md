@@ -1,91 +1,119 @@
 # SCRS Recalculation Audit — 2026-10-25
 
-## Scope and evidence classes
+## Scope and evidence status
 
-This audit rechecks numerical inconsistencies in the October 2026 SCRS manuscript using the manuscript's stated equations, public repository artifacts, and a reproducible synthetic Monte Carlo scenario. The corrected DOCX is delivered separately; the original manuscript file remains preserved.
+This audit rechecks the numerical inconsistencies in the October 2026 SCRS manuscript against its stated equations, the public repository artifacts, and a reproducible synthetic Monte Carlo scenario. The revised DOCX is supplied separately; the original manuscript is preserved unchanged.
 
-The results are separated into: (1) exact analytical calculations under declared assumptions, (2) synthetic Monte Carlo latency values, (3) non-reproducible quantities marked NR, and (4) unmeasured design targets. None of the simulation outputs is represented as deployment evidence.
+The results are separated into: (1) exact analytical calculations under declared assumptions, (2) synthetic Monte Carlo latency values, (3) non-reproducible quantities marked NR, and (4) unmeasured design targets. No simulation output is represented as deployment evidence.
 
-## 1. Recalculated probabilities
+## 1. Methodology recheck
 
-The manuscript states that (p_{hit}=0.78) and (p_{halt}=0.205) is conditional on admission:
+### 1.1 Regime probabilities
 
-[
-P(R_1)=0.78(1-0.205)=0.6201,quad
-P(R_2)=0.78(0.205)=0.1599,quad
-P(R_3)=1-0.78=0.22.
-]
+The manuscript states that `p_hit = 0.78` and `p_halt = 0.205` conditional on admission. Therefore:
 
-These sum to one. The legacy scenario-v2 code used (p_{hit}=0.72), (P(R_2)=0.10), and (P(R_3)=0.28), which conflicts with the probabilities specified in the manuscript. It is retained only as historical provenance and is not the current scenario.
+```text
+P(R1) = p_hit * (1 - p_halt) = 0.78 * (1 - 0.205) = 0.6201
+P(R2) = p_hit * p_halt       = 0.78 * 0.205       = 0.1599
+P(R3) = 1 - p_hit                                  = 0.2200
+sum                                                  = 1.0000
+```
 
-## 2. Recalculated Oracle-billed output tokens
+The historical `scenario-v2` code used `p_hit = 0.72`, `P(R2) = 0.10`, and `P(R3) = 0.28`; this conflicts with the manuscript's own stated assumptions and is superseded.
 
-The 1.4 Anchor-call average is conditional on successful fast-path completion. With five output tokens per Anchor, the unified system's expected Anchor output across all requests is:
+### 1.2 Resolving the Anchor-call definition conflict
 
-[
-0.6201	imes 1.4	imes 5=4.3407.
-]
+The source manuscript contains a direct definition conflict: Section 7.3 and Equations (18)/(20) define `n_anchor` as the number of Anchor calls conditional on successful fast-path completion, because the terms are multiplied by `alpha_eff`. However, Section 9.1 and the original Table 2 footnote described the same value as an unconditional per-request mean.
 
-Assuming the same full-Oracle output mean for bailout and miss requests—2,310 tokens in capsule-context configurations—the unified SCRS expectation is:
+The recalculated manuscript adopts the **conditional definition** because it is the definition consistent with the cost/latency equations. Sections 9.1 and the Table 2 footnote are corrected to match it. With `n_anchor = 1.4` per successful fast-path request and `k = 5` output tokens per call, the expected Anchor-call count across all requests is `0.6201 * 1.4 = 0.86814`, and the expected Anchor output across all requests is `0.6201 * 1.4 * 5 = 4.3407` tokens. Retaining the unconditional interpretation would produce 7 Anchor output tokens/request and would require changing Equations (18)/(20) as well; mixing the two conventions is invalid.
 
-[
-(0.1599+0.22)	imes 2310+0.6201	imes1.4	imes5
-=881.9097approx881.9.
-]
+### 1.3 Expected Oracle-billed output tokens
 
-For the similarity-only/no-gate ablation:
+Use the law of total expectation by mutually exclusive regime:
 
-[
-0.22	imes2310+0.78	imes1.4	imes5=513.66approx513.7.
-]
+```text
+E[N_oracle,out] =
+  P(R1) * E[N_anchor,out | R1]
++ P(R2) * E[N_full,out   | R2]
++ P(R3) * E[N_full,out   | R3]
+```
 
-For Tier II with Oracle rendering, the 900-token fast-path output is an explicit assumption, not a measurement:
+For the unified configuration, the scenario assumes the same 2,310-token full-Oracle output mean for bailout and miss requests, and uses `n_anchor = 1.4` conditionally on R1:
 
-[
-0.6201	imes900+0.3799	imes2380=1462.252
-]
-for raw-context Tier II, and
-[
-0.6201	imes900+0.3799	imes2310=1435.659
-]
-for capsule-context Tier I+II. Tier III-only outputs are (11.5	imes5=57.5) tokens for raw context and (9.6	imes5=48.0) for Tier I+III. The equal conditional bailout/miss output means are model assumptions and must be sensitivity-tested.
+```text
+(0.1599 + 0.22) * 2310 + 0.6201 * 1.4 * 5
+= 881.9097, approximately 881.9 tokens/request.
+```
 
-## 3. Token-based costs that can be calculated
+This replaces the inconsistent legacy value 631. For the similarity-only/no-gate ablation (hit probability 0.78; no bailout regime in that ablation):
 
-Using the declared tariffs—USD 2.50 per million input tokens and USD 10.00 per million output tokens—for 10,000 requests:
+```text
+0.22 * 2310 + 0.78 * 1.4 * 5
+= 513.66, approximately 513.7 tokens/request.
+```
 
-- Baseline: (6420	imes0.025+2380	imes0.10=$398.50).
-- Tier I only: (1180	imes0.025+2310	imes0.10=$260.50), a 34.6% reduction.
+This replaces the inconsistent legacy value 369. For Tier II with Oracle rendering, the successful-path output length of 900 tokens is an explicit scenario assumption:
 
-Costs and cost deltas for rows 3–8 are NR rather than guessed. The manuscript states the total Anchor prompt length but not the count of stable-prefix tokens versus uncached-suffix tokens, and route-specific billed input lengths are missing. Reverse-engineering the terms from legacy total costs would be circular.
+```text
+Raw-context Tier II:      0.6201 * 900 + 0.3799 * 2380 = 1462.252
+Capsule-context Tier I+II: 0.6201 * 900 + 0.3799 * 2310 = 1435.659
+Tier III-only, raw:        11.5 * 5 = 57.5 Anchor tokens/request
+Tier I + III:               9.6 * 5 = 48.0 Anchor tokens/request
+```
 
-## 4. Current synthetic latency scenario
+The equal conditional bailout/miss means and the 900-token successful-path Oracle output are model assumptions, not measurements, and should be sensitivity-tested.
 
-The current script uses seed `20261025`, 100,000 simulated requests/configuration, declared lognormal marginals, and a shared request-load latent factor plus independent residuals. The declared dependence settings are queue/TTFT correlation 0.5, Oracle TPOT/request-load loading 0.5, and SLM TTFT/TPOT correlation 0.5. The service-TTFT input-length scaling with a 0.30-second floor is an explicit sensitivity assumption. Each Anchor event is modelled as one serial API round trip; actual retry/batching/client behavior remains unverified.
+### 1.4 Token-based costs that remain reproducible
 
-| Configuration | Oracle output tokens/req | P50 E2E (s) | P95 E2E (s) | P50 TTFT (s) | Cost per 10,000 |
+At USD 2.50 per million input tokens and USD 10.00 per million output tokens, for 10,000 requests:
+
+- Baseline: `6420 * 0.025 + 2380 * 0.10 = USD 398.50`.
+- Tier I only: `1180 * 0.025 + 2310 * 0.10 = USD 260.50`, a 34.6% reduction under these stated token-price assumptions.
+
+Costs and cost deltas for rows 3–8 are **NR**, not guessed. The source provides total Anchor prompt lengths but omits the stable-prefix/uncached-suffix split needed to apply the provider's beta=0.10 cached-input factor correctly; some route-specific billed Oracle input means are also not specified. Reverse-engineering missing inputs from legacy total costs would be circular.
+
+## 2. Recalculated synthetic latency scenario
+
+The scenario simulates 100,000 requests per configuration with seed `20261025`. It uses lognormal marginals; a shared request-load latent factor plus independent residuals; a 0.5 latent-factor correlation/loading for queue/TTFT, Oracle TPOT/request-load, and local SLM TTFT/TPOT; an explicit 0.30-second fixed service-TTFT floor; and one serial Oracle round trip per logical Anchor interrupt.
+
+The initial recalculation attempt accidentally imposed perfect rank correlation across several marginals and was discarded. The current outputs are regenerated with the corrected correlation construction. Percentiles remain **synthetic scenario values**, not measured latency.
+
+| Configuration | Oracle output tokens/request (analytical) | P50 E2E seconds (synthetic) | P95 E2E seconds (synthetic) | P50 TTFT seconds (synthetic) | Total cost per 10,000 |
 |---|---:|---:|---:|---:|---:|
-| Baseline | 2,380.0 | 43.81 | 60.82 | 1.44 | USD 398.50 |
-| Tier I only | 2,310.0 | 41.77 | 58.18 | 0.59 | USD 260.50 |
-| Tier II only, Oracle-rendered | 1,462.3 | 20.71 | 54.85 | 1.45 | NR |
-| Tier III only, raw context | 57.5 | 22.84 | 36.21 | 0.04 | NR |
-| Tier I + III, no JIT | 48.0 | 11.54 | 17.46 | 0.04 | NR |
-| Tier I + II, no entropy interrupts | 1,435.7 | 19.79 | 52.26 | 0.60 | NR |
-| SCRS without transfer gate | 513.7 | 6.19 | 48.54 | 0.05 | NR |
-| Unified SCRS | 881.9 | 7.13 | 53.21 | 0.06 | NR |
+| Baseline (raw RAG + full Oracle) | 2,380.0 | 43.80 | 60.82 | 1.44 | USD 398.50 |
+| Tier I only (capsules) | 2,310.0 | 41.77 | 58.18 | 0.59 | USD 260.50 |
+| Tier II only (hardened JIT, Oracle-rendered) | 1,462.3 | 20.71 | 54.85 | 1.45 | NR |
+| Tier III only (entropy interrupt, raw context) | 57.5 | 22.84 | 36.21 | 0.04 | NR |
+| Tier I + III (no JIT) | 48.0 | 11.54 | 17.46 | 0.04 | NR |
+| Tier I + II (no entropy interrupt) | 1,435.7 | 19.79 | 52.26 | 0.60 | NR |
+| SCRS without transfer gate (similarity-only) | 513.7 | 6.19 | 48.54 | 0.05 | NR |
+| Unified SCRS (I + II + III) | 881.9 | 7.13 | 53.21 | 0.06 | NR |
 
-The initial recalculation attempt accidentally imposed perfect rank correlation across queue, TTFT, and TPOT and was discarded. The table above was regenerated from the corrected correlation model. All latency percentiles remain synthetic outputs, not measured values.
+## 3. Discrepancies resolved in the revised manuscript
 
-## 5. Revisions made
+1. Corrected the stale regime split `0.62 / 0.10 / 0.28` to `0.6201 / 0.1599 / 0.22`.
+2. Resolved the conditional-versus-unconditional Anchor-call definition conflict by aligning Section 9.1 and Table 2's note to Equations (18)/(20).
+3. Replaced the unified output-token value `631` with `881.9`, and the no-gate value `369` with `513.7`, under the explicit route/output assumptions.
+4. Recalculated the output-token means for rows 3–6 and the synthetic latency percentiles for all eight configurations.
+5. Removed unsupported savings claims for configurations 3–8, including the former 69.9%/78.3% savings and USD 33 gate-cost claims, because input-token billing assumptions do not uniquely determine total cost.
+6. Renamed Table 2's `alpha_eff`-style column to **No full fallback (%)** so it is not incorrectly applied to configurations without the JIT fallback regime.
+7. Kept Table 3 accuracy values explicitly labelled as design hypotheses. The abstract gate reference model's 26 conformance tests do not measure the production system's end-to-end cross-domain error rate.
 
-1. Corrected the probability split to 0.6201 / 0.1599 / 0.22.
-2. Defined the 1.4 Anchor-call mean as conditional on successful fast-path completion; the unconditional expected count is 0.86814/request for unified SCRS.
-3. Replaced the former unified and no-gate Oracle-output values of 631 and 369 with 881.9 and 513.7, respectively, under the declared output assumptions.
-4. Recalculated all eight P50/P95 and P50-TTFT values using the final seeded Monte Carlo model.
-5. Withheld unsupported total-cost values and savings percentages for rows 3–8.
-6. Renamed the table column to “No full fallback (%)” to avoid applying the formal (alpha_{eff}) notation to no-JIT ablations.
-7. Preserved Table 3 accuracy numbers as hypotheses only.
+## 4. Limitations and required evidence
 
-## 6. Limitations / next evidence
+- The latency input distributions are declared assumptions; no production traces were available to fit or validate them.
+- One serial API round trip per logical Anchor event is a simulation assumption. Actual transport retries, batching, cancellations, provider generations, and billed-token totals remain unverified.
+- Total cost for rows 3–8 remains NR until route-specific billed input means and the stable-prefix/uncached-suffix split are specified.
+- Quality targets and cross-domain error rates remain unmeasured.
+- The corrected projections do not validate the complete SCRS architecture or establish journal readiness.
 
-Actual production Anchor transport, retries, batching, provider billing, path-specific billed input token counts, and runtime latency traces remain unavailable. Accuracy targets and the end-to-end cross-domain transfer error rate remain unmeasured. An exact derivation under stated assumptions does not establish that those assumptions describe a deployed system.
+## 5. Reproduction
+
+From `results/recalculation-v1/`, run:
+
+```bash
+python recalculate_scrs_projection.py
+python plot_recalculated_figure.py
+```
+
+The first command regenerates the CSV and JSON manifest; the second regenerates Figure 3. The revised DOCX is provided as a separate download.
