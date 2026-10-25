@@ -8,21 +8,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-REQUEST_FIELDS = {
-    "request_id_hash", "terminal_regime", "anchor_interrupt_count",
-    "anchor_transport_attempt_count", "anchor_provider_generation_count",
-    "anchor_provider_generation_evidence", "anchor_provider_generation_unknown_reasons",
-    "anchor_tokens_billed", "anchor_tokens_billed_evidence",
-    "full_oracle_fallback_count", "full_oracle_transport_attempt_count",
-    "full_oracle_provider_generation_count", "full_oracle_fallback_avoided",
-    "full_oracle_fallback_avoided_evidence",
-}
-EVENT_FIELDS = {
-    "request_id_hash", "event_id", "event_type", "parent_event_id",
-    "causal_interrupt_seq", "attempt_number", "evidence_status",
-    "provider_generation_evidence", "provider_generation_unknown_reason",
-    "status", "ingest_replay_mark", "ingest_conflict_flag",
-}
+SCHEMA_PATH = Path(__file__).with_name("telemetry-schema.json")
+with SCHEMA_PATH.open("r", encoding="utf-8") as schema_file:
+    SCHEMA = json.load(schema_file)
+REQUEST_FIELDS = set(SCHEMA["request_level_fields"])
+EVENT_FIELDS = set(SCHEMA["required_event_level_fields"])
 EVENT_TYPES = {
     "anchor_interrupt", "anchor_transport_attempt", "anchor_provider_response",
     "full_oracle_fallback", "full_oracle_transport_attempt",
@@ -185,13 +175,15 @@ def validate_records(request_rows, event_rows, request_headers=None, event_heade
         avoided_evidence = _s(req.get("full_oracle_fallback_avoided_evidence")).upper()
         if avoided not in {"TRUE", "FALSE", "UNKNOWN"}:
             err("FALLBACK_AVOIDED_VALUE_INVALID", "fallback_avoided must be TRUE, FALSE, or UNKNOWN.", rid)
-        elif avoided == "TRUE" and (terminal != "FAST_PATH" or fallback_count != 0):
-            err("FALLBACK_AVOIDED_INCONSISTENT", "TRUE requires FAST_PATH and zero full fallback operations.", rid)
-        elif avoided == "FALSE" and terminal == "FAST_PATH" and fallback_count == 0:
-            err("FALLBACK_AVOIDED_INCONSISTENT", "FALSE conflicts with FAST_PATH and zero fallback operations.", rid)
-        elif avoided == "UNKNOWN" and avoided_evidence not in {"UNKNOWN_TERMINAL_REGIME", "UNRESOLVED_FALLBACK_OUTCOME"}:
-            err("FALLBACK_UNKNOWN_EVIDENCE_MISSING", "UNKNOWN requires an explicit unknown-outcome reason.", rid)
-        elif avoided != "UNKNOWN" and avoided_evidence not in {"KNOWN_TERMINAL_REGIME", ""}:
+        elif terminal == "FAST_PATH":
+            if fallback_count != 0 or avoided != "TRUE":
+                err("FALLBACK_AVOIDED_INCONSISTENT", "FAST_PATH requires zero full fallback operations and fallback_avoided=TRUE.", rid)
+        elif terminal == "FALLBACK":
+            if fallback_count is None or fallback_count < 1 or avoided != "FALSE":
+                err("FALLBACK_AVOIDED_INCONSISTENT", "FALLBACK requires at least one full fallback operation and fallback_avoided=FALSE.", rid)
+        elif avoided != "UNKNOWN" or avoided_evidence not in {"UNKNOWN_TERMINAL_REGIME", "UNRESOLVED_FALLBACK_OUTCOME"}:
+            err("FALLBACK_UNKNOWN_EVIDENCE_MISSING", "An unknown terminal regime/outcome requires fallback_avoided=UNKNOWN and explicit unknown evidence.", rid)
+        if avoided in {"TRUE", "FALSE"} and avoided_evidence not in {"KNOWN_TERMINAL_REGIME", ""}:
             err("FALLBACK_EVIDENCE_MISMATCH", "Known TRUE/FALSE requires KNOWN_TERMINAL_REGIME evidence.", rid)
 
         billing_evidence = _s(req.get("anchor_tokens_billed_evidence")).upper()
