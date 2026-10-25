@@ -1,3 +1,4 @@
+# In-repository reproducibility checks; no model credentials or network are required.
 name: SCRS public research data validation
 
 on:
