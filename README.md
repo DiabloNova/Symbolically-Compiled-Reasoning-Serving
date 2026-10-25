@@ -21,6 +21,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 ## Contents
 
 - `docs/section-5-cross-domain-safety.md` — conditional transfer-safety contract and validation protocol.
+- `docs/decision-semantics-preservation.md` — task-relative sufficient-capsule definition, exact/approximate decision-risk propositions, proofs, and a validation protocol; analytical specification only.
 - `docs/section-7-3-cost-latency.md` — corrected regime equations, output-token calculations, and cost/latency evidence boundaries.
 - `docs/recalculation-audit.md` — numerical audit, including the resolved conditional/unconditional Anchor definition conflict.
 - `docs/research-validation-ledger.md` — claim-to-evidence ledger.
