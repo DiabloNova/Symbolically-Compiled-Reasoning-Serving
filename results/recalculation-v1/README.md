@@ -7,7 +7,7 @@ This directory contains the corrected, reproducible numerical scenario supportin
 - `recalculated_table2.csv`: machine-readable outputs for all eight Table 2 configurations.
 - `recalculation_manifest.json`: assumptions, regime probabilities, results, and evidence-status warnings.
 - `plot_recalculated_figure.py`: regenerate Figure 3 from the CSV.
-- `recalculation_audit.md`: method, formulas, discrepancy log, and limitations.
+- [Recalculation audit](../../docs/recalculation-audit.md): method, formulas, discrepancy log, and limitations.
 
 ## Reproduce
 
