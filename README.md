@@ -26,7 +26,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 - `docs/research-validation-ledger.md` — claim-to-evidence ledger.
 - `docs/next-steps.md` — evidence-dependent work plan.
 - `experiments/cross_domain_safety/` — abstract gate reference model and 26 conformance tests; not production error-rate evidence.
-- `telemetry/` — request/event telemetry schema and templates.
+- `telemetry/` — request/event schema, CSV templates, and offline contract validator (`telemetry/README.md`).
 - `results/recalculation-v1/` — current recalculation model, CSV, manifest, and figure generator.
 - `results/scenario-v2/` — historical scenario retained for provenance; it is not the current calculation.
 
@@ -53,12 +53,13 @@ A source inconsistency was resolved by defining `n_anchor` as calls per successf
 
 ## Remaining evidence gaps
 
-1. Inspect the actual Anchor client; establish retries, batching, cancellations, and true HTTP/provider call counts.
-2. Reconcile provider-billed input/output tokens against request/event telemetry.
-3. Run the conformance contract against the real gate and measure end-to-end false-transfer rates on independently labelled test cases.
-4. Obtain request-level traces and empirical baseline comparisons before reporting measured P50/P95 or production cost reductions.
-5. Specify route-specific billed Oracle input tokens and the stable-prefix/uncached-suffix split before calculating total costs for rows 3–8.
-6. Publish baseline and SCRS model predictions only after the preregistered benchmark runner and SCRS execution path are available.
+1. **Runtime-source blocker:** no SCRS runtime or Anchor transport client is present in the main-branch source inventory. Obtain the implementation repository/path before inferring retry, batching, cancellation, provider-generation, or billing behaviour.
+2. The new offline telemetry contract validator has 15 passing local reference tests; it does not replace runtime instrumentation or provider evidence. See `telemetry/README.md`.
+3. Reconcile provider-billed input/output tokens against actual request/event telemetry and provider-side billing exports.
+4. Run the cross-domain gate contract against the real gate and measure end-to-end false-transfer rates on independently labelled test cases.
+5. Obtain request-level traces and empirical baseline comparisons before reporting measured P50/P95 or production cost reductions.
+6. Specify route-specific billed Oracle input tokens and the stable-prefix/uncached-suffix split before calculating total costs for rows 3–8.
+7. Publish baseline and SCRS model predictions only after an execution path is available and the preregistered benchmark has been run.
 
 ## Status
 
