@@ -2,8 +2,6 @@
 """Generate SCRS recalculation-v1 CSV and manifest. Latencies are synthetic, not measured."""
 from __future__ import annotations
 import csv, json, math
-from pathlib import Path
-import numpy as np
 from scenario_core import *
 
 def exact_token_cost(input_tokens, output_tokens, local_host=False):
@@ -25,14 +23,6 @@ def validate_exact_invariants():
     assert math.isclose(expected_billed_output_tokens('jit_oracle_capsule'), 1435.659, abs_tol=1e-9)
     assert math.isclose(exact_token_cost(BASELINE_INPUT_TOKENS, BASELINE_OUTPUT_TOKENS), 398.50, abs_tol=1e-9)
     assert math.isclose(exact_token_cost(TIER1_INPUT_TOKENS, TIER1_OUTPUT_TOKENS), 260.50, abs_tol=1e-9)
-
-def exact_token_cost(input_tokens, output_tokens, local_host=False):
-    if input_tokens is None or output_tokens is None:
-        return None
-    cost=(input_tokens*ORACLE_IN_PRICE_PER_M + output_tokens*ORACLE_OUT_PRICE_PER_M)*REQUESTS_PER_COST_BLOCK/1_000_000
-    if local_host:
-        cost += LOCAL_HOST_MONTHLY_USD/(MONTHLY_REQUESTS/REQUESTS_PER_COST_BLOCK)
-    return round(cost, 2)
 
 configs=[
  ('Baseline (raw RAG + full Oracle)','baseline'),
@@ -74,7 +64,7 @@ probability={
  'notes':[
   'P50/P95 are synthetic Monte Carlo outputs under declared latency distributions, not measurements.',
   'Latency dependence uses a shared request-load latent factor with rho_queue_ttft=0.5, rho_oracle_request_load_tpot=0.5, and rho_slm_ttft_tpot=0.5 plus independent Gaussian residuals; the earlier perfect-correlation attempt was discarded.',
-  'Full Oracle output means are 2380 tokens raw and 2310 capsule; 900-token fast-path Oracle rendering is an explicit assumption.',
+  'Full Oracle output means are 2380 tokens raw and 2310 tokens capsule; 900-token fast-path Oracle rendering is an explicit assumption.',
   'The 1.4 Anchor-call mean is conditional on successful fast-path completion; unconditional expected count is alpha_eff*1.4.',
   'share_without_full_fallback is a configuration-specific table value, not alpha_eff; it is 1.0 for no-JIT Tier III ablations.',
   'Input-token/cost values are omitted where route-specific Oracle input tokens and the stable-prefix/uncached-suffix split are unavailable.',
