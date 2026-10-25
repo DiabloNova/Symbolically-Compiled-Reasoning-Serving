@@ -1,31 +1,75 @@
-# Replacement draft — Section 7.3: Expected usage, cost, and latency
+# Replacement draft — Section 7.3: Expected usage, cost, and latency (recalculation-v1)
 
-Define three mutually exclusive execution regimes: successful fast-path completion (R_1), bailout after partial local execution (R_2), and a cache/admission miss (R_3). Let (p_{hit}) be the probability of admission to the fast path and (p_{halt}) the conditional probability of a halt after admission. Then
+Define three mutually exclusive execution regimes: successful fast-path completion (R1), bailout after partial local execution (R2), and admission miss (R3). Let `p_hit` be the probability of admission and `p_halt` the conditional probability of a halt after admission. Then:
 
-\[
-P(R_1)=p_{hit}(1-p_{halt}),\quad P(R_2)=p_{hit}p_{halt},\quad P(R_3)=1-p_{hit}.
-\]
+```text
+P(R1) = p_hit * (1 - p_halt)
+P(R2) = p_hit * p_halt
+P(R3) = 1 - p_hit
+alpha_eff = P(R1)
+```
 
-These probabilities sum to one; no independence assumption is needed because (p_{halt}) is conditional on admission. Define (alpha_{eff}=P(R_1)).
+With scenario assumptions `p_hit = 0.78` and `p_halt = 0.205`, these give `P(R1) = 0.6201`, `P(R2) = 0.1599`, and `P(R3) = 0.22`, which sum to one. These are assumptions, not measured hit/halt rates.
 
-Let (N_{anchor}) denote billable Anchor output tokens on successful fast-path requests and (N_{CoT}) full-oracle output tokens on fallback requests. The general expected output-token accounting is
+## Oracle-billed output tokens
 
-\[
-E[N_{Or,out}]=P(R_1)E[N_{anchor}|R_1]+P(R_2)E[N_{CoT}|R_2]+P(R_3)E[N_{CoT}|R_3].
-\]
+The general expected output-token accounting follows the law of total expectation:
 
-Only if the conditional fallback means are equal may this be simplified to
-\[
-E[N_{Or,out}]=(1-\alpha_{eff})\bar N_{CoT}+\alpha_{eff}\bar N_{anchor}.
-\]
-The same regime-wise accounting applies to input tokens and API attempts. A logical Anchor event, an HTTP/API attempt, a provider-billed generation, and returned Anchor tokens are distinct quantities and must not share one counter.
+```text
+E[N_oracle,out] =
+  P(R1) * E[N_anchor,out | R1]
++ P(R2) * E[N_full,out   | R2]
++ P(R3) * E[N_full,out   | R3]
+```
 
-Expected monetary cost can be written as
-\[
-E[C]=c_{in}E[N_{Or,in}]+c_{out}E[N_{Or,out}]+E[C_{local}],
-\]
-where prices, cached-token treatment, retries, and local-compute amortization must be declared. Without those inputs, published dollar values cannot be independently reproduced.
+The simplified full-fallback component `(P(R2) + P(R3)) * N_CoT_mean` requires equal conditional fallback output means for bailout and miss. That equality is an explicit scenario assumption in recalculation-v1, not a measured property.
 
-Expected end-to-end latency is the regime-weighted expectation of conditional end-to-end latency. Each duration must be defined on a non-overlapping critical path; overlapping work must be calculated from timestamps, not by summing component durations. An expected latency does not determine P50 or P95. Percentiles require request-level traces or a fully specified simulation, labelled as such.
+### Anchor-call definition
 
-**Consistency check:** using the manuscript's baseline Oracle output mean of 2,380 tokens and (alpha_{eff}=0.62), the fallback contribution alone is (0.38\times2380=904.4) tokens before adding any positive Anchor output. A Unified SCRS table value of 894 therefore needs a different explicitly documented conditional fallback mean, a changed (alpha_{eff}), or correction. It is not explained by the simplified equation as currently stated.
+The source manuscript had an internal conflict: Section 7.3 and Equations (18)/(20) used `n_anchor` as the mean calls **conditional on fast-path completion**, while Section 9.1 and the original Table 2 footnote called it the unconditional per-request mean. This replacement selects the **conditional** definition because the equations explicitly multiply the Anchor terms by `alpha_eff`. Section 9.1 and the Table 2 footnote are updated to match.
+
+With `n_anchor = 1.4` calls per successful fast-path request and `k = 5` tokens returned per call, unified SCRS has expected Anchor output across all requests of:
+
+```text
+alpha_eff * n_anchor * k = 0.6201 * 1.4 * 5 = 4.3407 tokens/request
+```
+
+Assuming the same 2,310-token full-Oracle output mean for bailout and miss requests:
+
+```text
+E[N_oracle,out] = (0.1599 + 0.22) * 2310 + 0.6201 * 1.4 * 5
+                = 881.9097, approximately 881.9 tokens/request
+```
+
+For the similarity-only/no-gate ablation, with a hit probability of 0.78 and no modeled bailout regime:
+
+```text
+E[N_oracle,out] = 0.22 * 2310 + 0.78 * 1.4 * 5
+                = 513.66, approximately 513.7 tokens/request
+```
+
+For Tier II with Oracle rendering on the successful path, the 900-token fast-path output is an explicit assumption. Using raw/capsule full-fallback means of 2,380/2,310 respectively:
+
+```text
+Raw-context Tier II:       0.6201 * 900 + 0.3799 * 2380 = 1462.252
+Capsule-context Tier I+II:  0.6201 * 900 + 0.3799 * 2310 = 1435.659
+Tier III-only raw output:  11.5 * 5 = 57.5 Anchor tokens/request
+Tier I + III output:        9.6 * 5 = 48.0 Anchor tokens/request
+```
+
+The 900-token fast-path output and equal conditional fallback means are modeling assumptions. All must be sensitivity-tested against actual route-wise token logs.
+
+## Costs currently reproducible
+
+Under the declared tariffs of USD 2.50 per million input tokens and USD 10.00 per million output tokens, per 10,000 requests:
+
+- Baseline: `6420 * 0.025 + 2380 * 0.10 = USD 398.50`.
+- Tier I only: `1180 * 0.025 + 2310 * 0.10 = USD 260.50`, 34.6% lower than baseline.
+
+Total costs and savings deltas for configurations 3–8 are marked NR. The manuscript provides total Anchor prompt lengths but not the stable-prefix/uncached-suffix token split needed to apply the provider's `beta = 0.10` cached-input factor. Route-specific billed Oracle input lengths are also incomplete for several rows. Reverse-engineering those missing inputs from legacy dollar values is not valid.
+
+## Latency evidence
+
+The recalculation-v1 script simulates 100,000 requests/configuration with seed `20261025`, lognormal marginal distributions, a shared request-load latent factor and independent residuals, latent-factor correlation/loading parameters of 0.5, and an assumed 0.30-second fixed service-TTFT floor. The first recalculation attempt imposed accidental perfect correlation and was discarded.
+
+P50/P95 are synthetic scenario percentiles, not values derivable from expected-value equations and not measured production latency. The simulation assumes one serial Oracle round trip per logical Anchor call; the actual client path, retries, batching, cancellations, and provider billing remain unverified.
