@@ -6,7 +6,7 @@ The repository inventory on 2026-10-25 confirmed that the default branch contain
 
 ## 2. Offline telemetry contract validation — added, locally tested
 
-Added telemetry/validate_telemetry.py, a standard-library CSV validator for request/event consistency, and tests/test_telemetry_validation.py. Its reference suite has 15 passing tests for no-interrupt fast path, multiple interrupts, retry/attempt separation, unknown timeout outcomes, admission miss with fallback, halt followed by fallback, replay deduplication, conflicting event IDs, unavailable billing, counter mismatches, and orphan events. These are contract fixtures, not production traces or measured SCRS results. The repository has no checked-in GitHub Actions workflow, so this pass is local rather than CI evidence.
+Added telemetry/validate_telemetry.py, a standard-library CSV validator for request/event consistency, and tests/test_telemetry_validation.py. Its reference suite has 17 passing tests for no-interrupt fast path, multiple interrupts, retry/attempt separation, unknown timeout outcomes, admission miss with fallback, halt followed by fallback, replay deduplication, conflicting event IDs, unavailable billing, counter mismatches, unknown-state reason codes, orphan events, full schema-header checks, and terminal-regime/fallback invariants. These are contract fixtures, not production traces or measured SCRS results. The repository has no checked-in GitHub Actions workflow, so this pass is local rather than CI evidence.
 
 ## 3. Instrument the actual runtime and transport boundaries
 
