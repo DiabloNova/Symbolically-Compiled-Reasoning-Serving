@@ -8,11 +8,11 @@ The paper is not considered submission-ready until its claims, method, algorithm
 
 ## Current manuscript and evidence status
 
-- **Numerical recalculation:** a corrected, seeded scenario and audit are available under `results/recalculation-v1/`.
-- **Evidence status:** exact regime probabilities and output-token calculations are analytical under stated assumptions; P50/P95 values are synthetic Monte Carlo outputs, not deployment measurements.
+- **Numerical recalculation:** corrected, reproducible scenario and audit are available under `results/recalculation-v1/`.
+- **Evidence status:** exact regime probabilities and Oracle-output token calculations are analytical under stated assumptions; P50/P95 values are synthetic Monte Carlo outputs, not deployment measurements.
 - **Cost status:** total costs and savings percentages are only reported for the baseline and Tier I-only configurations. Rows 3–8 remain NR because route-specific billed Oracle input means and the stable-prefix/uncached-suffix split are not sufficiently specified.
 - **Accuracy status:** Table 3 values remain design targets, not observed results.
-- **Manuscript artifact:** a recalculated DOCX was produced from a clean manuscript copy and is supplied separately with the research artifacts. The older binary at `manuscripts/SCRS_Manuscript.docx` remains a historical repository copy and has not been replaced by this text-artifact PR.
+- **Manuscript artifact:** the recalculated DOCX is supplied separately. The original manuscript file remains preserved and is not replaced by this text-only PR.
 
 ## Research workflow
 
@@ -22,13 +22,12 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 
 - `docs/section-5-cross-domain-safety.md` — conditional transfer-safety contract and validation protocol.
 - `docs/section-7-3-cost-latency.md` — corrected regime equations, output-token calculations, and cost/latency evidence boundaries.
-- `docs/recalculation-audit.md` — discrepancy log and numerical audit.
-- `docs/section-8-3-algorithm.md`, `docs/section-8-4-telemetry.md` — algorithm and telemetry requirements.
+- `docs/recalculation-audit.md` — numerical audit, including the resolved conditional/unconditional Anchor definition conflict.
 - `docs/research-validation-ledger.md` — claim-to-evidence ledger.
 - `docs/next-steps.md` — evidence-dependent work plan.
 - `experiments/cross_domain_safety/` — abstract gate reference model and 26 conformance tests; not production error-rate evidence.
 - `telemetry/` — request/event telemetry schema and templates.
-- `results/recalculation-v1/` — current recalculation model, CSV, manifest, and audit.
+- `results/recalculation-v1/` — current recalculation model, CSV, manifest, and figure generator.
 - `results/scenario-v2/` — historical scenario retained for provenance; it is not the current calculation.
 
 ## Evidence labels
@@ -41,23 +40,24 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 
 ## Core probability model
 
-For gated configurations, with (p_{hit}=0.78) and (p_{halt}=0.205) conditional on admission:
+For gated configurations, with `p_hit = 0.78` and `p_halt = 0.205` conditional on admission:
 
-[
-P(R_1)=p_{hit}(1-p_{halt})=0.6201,quad
-P(R_2)=p_{hit}p_{halt}=0.1599,quad
-P(R_3)=1-p_{hit}=0.22.
-]
+```text
+P(R1) = p_hit * (1 - p_halt) = 0.6201
+P(R2) = p_hit * p_halt       = 0.1599
+P(R3) = 1 - p_hit            = 0.2200
+Sum                            = 1.0000
+```
 
-These probabilities sum to one. The current output-token calculations and synthetic latency outputs are documented in the recalculation manifest and CSV.
+A source inconsistency was resolved by defining `n_anchor` as calls per successful fast-path request, consistent with Equations (18)/(20), where the anchor-call term is multiplied by `alpha_eff`. The manuscript's Section 9.1 and Table 2 footnote were corrected to use this same definition.
 
 ## Remaining evidence gaps
 
-1. Inspect the actual Anchor implementation; establish retries, batching, and true HTTP/provider call counts.
+1. Inspect the actual Anchor client; establish retries, batching, cancellations, and true HTTP/provider call counts.
 2. Reconcile provider-billed input/output tokens against request/event telemetry.
 3. Run the conformance contract against the real gate and measure end-to-end false-transfer rates on independently labelled test cases.
 4. Obtain request-level traces and empirical baseline comparisons before reporting measured P50/P95 or production cost reductions.
-5. Specify route-specific Oracle input tokens and the cached-prefix/uncached-suffix split before calculating total costs for rows 3–8.
+5. Specify route-specific billed Oracle input tokens and the stable-prefix/uncached-suffix split before calculating total costs for rows 3–8.
 6. Publish baseline and SCRS model predictions only after the preregistered benchmark runner and SCRS execution path are available.
 
 ## Status
