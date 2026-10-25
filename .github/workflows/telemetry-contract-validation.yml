@@ -1,0 +1,28 @@
+name: SCRS telemetry contract
+
+on:
+  pull_request:
+    paths:
+      - "telemetry/**"
+      - "tests/test_telemetry_validation.py"
+      - ".github/workflows/telemetry-contract-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  telemetry-contract:
+    name: Validate request/event telemetry contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile validator and tests
+        run: python -m py_compile telemetry/validate_telemetry.py tests/test_telemetry_validation.py
+      - name: Run telemetry contract tests
+        run: python -m unittest discover -s tests -p "test_telemetry_validation.py" -v
