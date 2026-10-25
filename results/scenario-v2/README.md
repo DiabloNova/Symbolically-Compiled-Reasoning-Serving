@@ -1,18 +1,9 @@
-# Scenario v2 — synthetic, not measured
+# Scenario v2 — historical synthetic scenario (superseded)
 
-This directory contains the current Monte Carlo simulation source and its generated outputs. It simulates 100,000 requests per configuration with seed `20261022`. All latency percentiles are **synthetic scenario outputs**, not production telemetry.
+This directory is retained for provenance only. It is **not** the current calculation behind the revised SCRS manuscript.
 
-## Artifacts
+Scenario v2 used seed `20261022` and assumed `p_hit = 0.72`, `P(R2) = 0.10`, and `P(R3) = 0.28`. Those values conflict with the manuscript's stated assumptions `p_hit = 0.78` and `p_halt = 0.205) conditional on admission, which imply (P(R1)=0.6201), (P(R2)=0.1599), and (P(R3)=0.22). It also did not consistently apply the manuscript's distinction between conditional and unconditional Anchor-call intensity.
 
-- `SCRS_latency_scenario_v2.py` — simulation source.
-- `results.csv` — regenerated summary table aligned with the script's output fields and the snapshot.
-- `snapshot.json` — machine-readable assumptions and summary results.
-- `SCRS_Latency_Scenario_v2_Snapshot.xlsx` — spreadsheet snapshot.
-- `SCRS_Latency_Scenario_v2_P50_P95.png` — plot of synthetic P50/P95 values.
-- `manifest.json` — artifact inventory and caveats.
+Use [recalculation-v1](../recalculation-v1/README.md) for the corrected current scenario, CSV, manifest, and Figure 3 generator. Recalculation-v1 also corrects an initial implementation error that accidentally imposed perfect correlation between latency marginals. Its latency outputs are still synthetic Monte Carlo values, not production measurements.
 
-## Critical caveats
-
-The scenario assumes one serial Oracle API round trip per logical Anchor interrupt. The manuscript pseudocode contains one `Oracle.generateAnchors(...)` invocation per interrupt, but the actual implementation's HTTP request count, retries, batching, and caching have not been verified. The simulation uses explicit assumed latency distributions and a `p_hit` value that the manuscript does not specify.
-
-Unified SCRS's simulated P50/P95 are about 8.84 s / 53.65 s under these assumptions. These numbers must not be presented as measured performance or as validation of the architecture. Reproduction requires Python plus `numpy`, `pandas`, `openpyxl`, and `matplotlib`.
+Do not cite the v2 Unified SCRS P50/P95 values of approximately 8.84/53.65 seconds as the current manuscript results. Actual Anchor transport round trips, retries, billing, and empirical latency remain unverified.
