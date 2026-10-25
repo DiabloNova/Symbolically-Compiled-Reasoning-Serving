@@ -2,70 +2,64 @@
 
 ## Purpose: publication-quality, reproducible research
 
-The primary objective is to transform the existing SCRS manuscript into a scientifically defensible paper suitable for submission to a reputable peer-reviewed academic journal, while establishing a repeatable workflow for future revisions, experiments, tables, figures, and manuscript releases.
-
-This repository is a research-production workspace, not merely a collection of rewritten paragraphs. The work must preserve the source paper's actual claims and organization where supportable, distinguish source-derived facts from analysis and external literature, identify unsupported claims explicitly, and never promote simulated or inferred results as empirical measurements.
+This repository is a research-production workspace for making SCRS scientifically defensible and reproducible. Preserve source facts where supportable, distinguish analytical derivations from simulations and measurements, and never present inferred or synthetic results as empirical evidence.
 
 The paper is not considered submission-ready until its claims, method, algorithm, experiments, statistics, figures, limitations, citations, and reproducibility materials have passed documented review.
 
-## Working research repository
+## Current manuscript and evidence status
 
-**Manuscript status:** partial revision and analytical reconstruction in progress.  
-**Evidence status:** latency figures in this repository are synthetic scenario outputs, not production measurements.  
-**Source status:** the supplied `SCRS_Manuscript.docx` was not modified. Its archive reported a CRC error in `word/media/image1.png`; therefore this repository must not be treated as a complete replacement manuscript.
-
-This repository separates revised passages, analytical assumptions, telemetry requirements, and synthetic scenario outputs. Results may be described as *measured* only when supported by trace/log provenance, collection method, sample size, and implementation version.
+- **Numerical recalculation:** a corrected, seeded scenario and audit are available under `results/recalculation-v1/`.
+- **Evidence status:** exact regime probabilities and output-token calculations are analytical under stated assumptions; P50/P95 values are synthetic Monte Carlo outputs, not deployment measurements.
+- **Cost status:** total costs and savings percentages are only reported for the baseline and Tier I-only configurations. Rows 3–8 remain NR because route-specific billed Oracle input means and the stable-prefix/uncached-suffix split are not sufficiently specified.
+- **Accuracy status:** Table 3 values remain design targets, not observed results.
+- **Manuscript artifact:** a recalculated DOCX was produced from a clean manuscript copy and is supplied separately with the research artifacts. The older binary at `manuscripts/SCRS_Manuscript.docx` remains a historical repository copy and has not been replaced by this text-artifact PR.
 
 ## Research workflow
 
-Follow the staged workflow in [Research-to-publication workflow](docs/research-production-workflow.md). The governing stages are:
-
-1. **Source recovery and inventory** — establish a readable, hashed canonical manuscript and inventory every claim, equation, table, figure, citation, and referenced artifact.
-2. **Scientific audit** — assess novelty, related work, definitions, assumptions, proofs/derivations, algorithm correctness, evaluation design, statistical validity, and limitations before rewriting.
-3. **Claim-to-evidence mapping** — label each substantive statement as source-derived, analytically derived, externally supported, experimentally measured, simulated, or unresolved.
-4. **Section-by-section rewrite** — preserve the meaning where valid; correct inconsistencies transparently; do not invent experiments, citations, or results.
-5. **Reproducible evaluation** — version code, data provenance, environment, seeds, configurations, and scripts that generate tables/figures.
-6. **Independent validation** — regenerate artifacts from a clean environment and compare them with the manuscript.
-7. **Journal readiness review** — align scope and format to a selected journal only after the scientific core and evidence are stable.
+Follow the staged workflow in [Research-to-publication workflow](docs/research-production-workflow.md): recover and inventory the manuscript; audit claims and equations; map claims to evidence; rewrite sections without inventing results; version data/code; independently regenerate outputs; and conduct journal-specific readiness review only after the evidence is stable.
 
 ## Contents
 
-- `docs/section-5-cross-domain-safety.md` — cross-domain transfer safety: formal contract, conditional proposition, and reproducible validation protocol.
-- `docs/section-7-3-cost-latency.md` — execution regimes, expected usage, cost, and latency.
-- `docs/section-8-3-algorithm.md` — revised execution pipeline and algorithmic caveats.
-- `docs/section-8-4-telemetry.md` — telemetry requirements.
-- `docs/section-9-4-sensitivity.md` — sensitivity interpretation.
-- `docs/appendix-a-3.md` — derivation of expected usage and latency.
-- `docs/anchor-telemetry-audit-prior.md` — source-level audit findings.
-- `docs/research-validation-ledger.md` — claims and evidence ledger.
-- `docs/next-steps.md` — ordered validation plan.
-- `experiments/cross_domain_safety/` — executable reference model of the acceptance contract with its deterministic conformance/adversarial test suite and fixture manifest.
-- `telemetry/` — request/event telemetry template and schema.
-- `results/scenario-v2/` — reproducible synthetic simulation artifacts.
+- `docs/section-5-cross-domain-safety.md` — conditional transfer-safety contract and validation protocol.
+- `docs/section-7-3-cost-latency.md` — corrected regime equations, output-token calculations, and cost/latency evidence boundaries.
+- `docs/recalculation-audit.md` — discrepancy log and numerical audit.
+- `docs/section-8-3-algorithm.md`, `docs/section-8-4-telemetry.md` — algorithm and telemetry requirements.
+- `docs/research-validation-ledger.md` — claim-to-evidence ledger.
+- `docs/next-steps.md` — evidence-dependent work plan.
+- `experiments/cross_domain_safety/` — abstract gate reference model and 26 conformance tests; not production error-rate evidence.
+- `telemetry/` — request/event telemetry schema and templates.
+- `results/recalculation-v1/` — current recalculation model, CSV, manifest, and audit.
+- `results/scenario-v2/` — historical scenario retained for provenance; it is not the current calculation.
 
 ## Evidence labels
 
-- **Source-derived:** text or values reported in the supplied manuscript.
-- **Analytical:** derived from stated assumptions and equations.
-- **Scenario / synthetic:** generated under declared assumptions; not production telemetry.
-- **Measured:** requires implementation traces or a reproducible experiment and provenance.
+- **Source-derived:** stated in the manuscript or a cited source.
+- **Analytical:** follows from equations and declared assumptions.
+- **Scenario / synthetic:** generated with a defined simulation; not production telemetry.
+- **Measured:** requires a documented experiment with provenance, collection method, sample size, implementation version, and uncertainty procedure.
+- **NR / unresolved:** the needed input values are not available; no value should be reverse-engineered from a legacy headline.
 
-## Core model
+## Core probability model
 
-Let the successful fast-path probability be
-\[
-\alpha_{\mathrm{eff}}=p_{\mathrm{hit}}(1-p_{\mathrm{halt}}),
-\]
-where (p_{\mathrm{halt}}) is conditional on fast-path admission. The three regimes are successful fast path (R_1), bailout (R_2), and miss (R_3). The exact accounting and qualifications are documented in the section drafts.
+For gated configurations, with (p_{hit}=0.78) and (p_{halt}=0.205) conditional on admission:
 
-## Critical open questions
+[
+P(R_1)=p_{hit}(1-p_{halt})=0.6201,quad
+P(R_2)=p_{hit}p_{halt}=0.1599,quad
+P(R_3)=1-p_{hit}=0.22.
+]
 
-1. Inspect the actual Anchor implementation and determine whether each logical interrupt produces a separate HTTP/API round trip, or whether retries, batching, caching, or internal transport changes that mapping.
-2. Separate logical anchor events, API attempts, provider-billed generations, and returned anchor tokens.
-3. Fix the Algorithm 1 counter issue: the supplied pseudocode initializes `n_int = 0` but does not increment it before using it to report `oracleCallsAvoided`.
-4. Do not infer P50/P95 from expected-value equations. Percentiles require empirical traces or a fully specified and clearly labelled simulation.
-5. Reconcile Table 2 and Figure 3, including the Unified SCRS output-token inconsistency, using declared assumptions or corrected evidence.
+These probabilities sum to one. The current output-token calculations and synthetic latency outputs are documented in the recalculation manifest and CSV.
+
+## Remaining evidence gaps
+
+1. Inspect the actual Anchor implementation; establish retries, batching, and true HTTP/provider call counts.
+2. Reconcile provider-billed input/output tokens against request/event telemetry.
+3. Run the conformance contract against the real gate and measure end-to-end false-transfer rates on independently labelled test cases.
+4. Obtain request-level traces and empirical baseline comparisons before reporting measured P50/P95 or production cost reductions.
+5. Specify route-specific Oracle input tokens and the cached-prefix/uncached-suffix split before calculating total costs for rows 3–8.
+6. Publish baseline and SCRS model predictions only after the preregistered benchmark runner and SCRS execution path are available.
 
 ## Status
 
-The repository currently contains working section drafts and a synthetic scenario. It does **not** contain a verified implementation audit or real production telemetry. Claims depending on those sources remain unverified.
+The repository contains an executable abstract gate reference model, a corrected synthetic latency scenario, analytically derived token calculations, and a reproducibility plan. It does not contain verified production traces or end-to-end model predictions. Claims requiring those sources remain unverified.
