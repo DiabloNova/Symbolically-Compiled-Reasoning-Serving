@@ -1,3 +1,4 @@
+# Reproducible finite-alphabet checks for the formal decision-preservation claims.
 name: SCRS decision-semantics formal checks
 
 on:
