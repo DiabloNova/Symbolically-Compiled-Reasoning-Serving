@@ -1,0 +1,34 @@
+name: SCRS decision-semantics formal checks
+
+on:
+  pull_request:
+    paths:
+      - "docs/decision-semantics-preservation.md"
+      - "experiments/decision_semantics/**"
+      - "tests/test_decision_semantics_toy.py"
+      - ".github/workflows/decision-semantics-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact-toy-checks:
+    name: Check exact finite-distribution examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile theorem checker and tests
+        run: >-
+          python -m py_compile
+          experiments/decision_semantics/toy_exact_checks.py
+          tests/test_decision_semantics_toy.py
+      - name: Run exact finite-distribution sanity tests
+        run: python -m unittest discover -s tests -p "test_decision_semantics_toy.py" -v
+      - name: Emit machine-readable toy report
+        run: python experiments/decision_semantics/toy_exact_checks.py
