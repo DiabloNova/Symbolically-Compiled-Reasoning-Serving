@@ -294,6 +294,23 @@ def metrics_for(task_id: str, rows: list[dict[str, Any]], predictions: list[dict
     else:
         ci = None
 
+    return {
+        "task_id": task_id,
+        "n": n,
+        "correct": correct,
+        "invalid_outputs": invalid,
+        "valid_prediction_rate": (n - invalid) / n if n else None,
+        "accuracy": accuracy,
+        "accuracy_ci95_wilson": ci,
+        "macro_precision": sum(x["precision"] for x in per_class.values()) / len(labels),
+        "macro_recall": sum(x["recall"] for x in per_class.values()) / len(labels),
+        "macro_f1": sum(x["f1"] for x in per_class.values()) / len(labels),
+        "per_class": per_class,
+        "confusion_matrix": confusion,
+        "strict_existing_scorer": "not-run-invalid-output" if invalid else "compatible",
+    }
+
+
 def condition_usage_metrics(task_id: str, condition: str, cases: list[dict[str, Any]]) -> dict[str, Any]:
     relevant = [case for case in cases if case.get("task_id") == task_id]
     request_latencies: list[float] = []
@@ -345,23 +362,6 @@ def condition_usage_metrics(task_id: str, condition: str, cases: list[dict[str, 
             "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; "
             "the run-level provider total counts it once"
         ),
-    }
-
-
-    return {
-        "task_id": task_id,
-        "n": n,
-        "correct": correct,
-        "invalid_outputs": invalid,
-        "valid_prediction_rate": (n - invalid) / n if n else None,
-        "accuracy": accuracy,
-        "accuracy_ci95_wilson": ci,
-        "macro_precision": sum(x["precision"] for x in per_class.values()) / len(labels),
-        "macro_recall": sum(x["recall"] for x in per_class.values()) / len(labels),
-        "macro_f1": sum(x["f1"] for x in per_class.values()) / len(labels),
-        "per_class": per_class,
-        "confusion_matrix": confusion,
-        "strict_existing_scorer": "not-run-invalid-output" if invalid else "compatible",
     }
 
 
