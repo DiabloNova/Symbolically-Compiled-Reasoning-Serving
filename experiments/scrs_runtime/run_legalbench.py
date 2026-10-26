@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts" / "data"))
 sys.path.insert(0, str(ROOT / "scripts" / "evaluation"))
 
@@ -210,7 +211,7 @@ def logical_interrupt_event(request_id_hash: str, sequence: int, run_id: str,
         "output_tokens": None,
         "output_token_basis": None,
         "evidence_status": "observed",
-        "provider_generation_evidence": "UNAVAILABLE",
+        "provider_generation_evidence": None,
         "provider_generation_unknown_reason": None,
         "status": "accepted",
         "retry_reason": None,
