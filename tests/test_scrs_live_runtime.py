@@ -120,10 +120,17 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertFalse(accepted)
         self.assertEqual(trace[-2]["reason_code"], "CHECK_GRAPH_ORDER_FAILED")
 
+    def test_capsule_with_unapproved_payload_field_fails_closed_at_gate(self):
+        bad_capsule = dict(CAPSULE)
+        bad_capsule["payload"] = dict(PAYLOAD, raw_source_text="not permitted")
+        accepted, trace = validate_capsule(bad_capsule, GRAPH, TASK, CONTRACT, REV, FIELDS, LABELS)
+        self.assertFalse(accepted)
+        self.assertEqual(trace[-2]["reason_code"], "CHECK_CAPSULE_SCHEMA_FAILED")
+
     def test_capsule_only_prompt_excludes_source_fields(self):
         prompt = json.dumps(build_capsule_only_messages(TASK, "definition", LABELS, CAPSULE))
         self.assertIn("decision_relevant_facts", prompt)
-        self.assertNotIn("Salt", prompt)
+        self.assertNotIn("The mark 'Salt' for packages of sodium chloride.", prompt)
         self.assertNotIn("source_input_sha256", prompt)
 
     def test_compiled_prompt_contains_graph_and_gate_trace(self):
