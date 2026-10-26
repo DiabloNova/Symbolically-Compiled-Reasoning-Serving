@@ -5,11 +5,13 @@ import socket
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import URLError
 
 from experiments.scrs_runtime.anchor_client import (
     AnchorClient,
     OpenAICompatibleClient,
     ProviderConfigurationError,
+    ProviderRequestError,
 )
 from experiments.scrs_runtime.scrs_runtime import (
     CapsuleValidationError,
@@ -199,6 +201,43 @@ class AnchorClientTests(unittest.TestCase):
         self.assertEqual(result.attempts[0]["provider_generation_unknown_reason"], "TIMEOUT_OUTCOME_UNKNOWN")
         self.assertEqual(result.attempts[1]["provider_generation_evidence"], "CONFIRMED")
         sleep_mock.assert_called_once()
+
+
+    @patch("experiments.scrs_runtime.anchor_client.time.sleep")
+    @patch("experiments.scrs_runtime.anchor_client.urlopen")
+    def test_final_timeout_raises_with_attempt_and_event_evidence(self, urlopen_mock, sleep_mock):
+        urlopen_mock.side_effect = socket.timeout()
+        client = self.make_client(retries=0)
+        with self.assertRaises(ProviderRequestError) as raised:
+            client.chat(
+                messages=[{"role": "user", "content": "test"}],
+                request_id_hash="c" * 32,
+                causal_interrupt_seq=5,
+                max_tokens=5,
+            )
+        error = raised.exception
+        self.assertEqual(len(error.attempts), 1)
+        self.assertEqual(error.attempts[0]["status"], "timeout")
+        self.assertEqual(error.attempts[0]["provider_generation_unknown_reason"], "TIMEOUT_OUTCOME_UNKNOWN")
+        self.assertEqual(len(error.events), 1)
+        self.assertEqual(error.events[0]["event_type"], "anchor_transport_attempt")
+        sleep_mock.assert_not_called()
+
+    @patch("experiments.scrs_runtime.anchor_client.time.sleep")
+    @patch("experiments.scrs_runtime.anchor_client.urlopen")
+    def test_timeout_wrapped_by_urlerror_stays_timeout_unknown(self, urlopen_mock, sleep_mock):
+        urlopen_mock.side_effect = URLError(socket.timeout("socket timed out"))
+        with self.assertRaises(ProviderRequestError) as raised:
+            self.make_client(retries=0).chat(
+                messages=[{"role": "user", "content": "test"}],
+                request_id_hash="d" * 32,
+                causal_interrupt_seq=6,
+                max_tokens=5,
+            )
+        self.assertEqual(raised.exception.attempts[0]["provider_generation_unknown_reason"],
+                         "TIMEOUT_OUTCOME_UNKNOWN")
+        self.assertEqual(raised.exception.events[0]["status"], "timeout")
+        sleep_mock.assert_not_called()
 
     def test_anchor_is_hard_capped_at_five_tokens(self):
         client = self.make_client()
