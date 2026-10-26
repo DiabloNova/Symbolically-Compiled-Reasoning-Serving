@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/blob/main/experiments/scrs_runtime/event-schema.v1.json",
+  "title": "SCRS experimental benchmark event",
+  "description": "Experiment-specific runtime events. This schema supplements, and does not replace, telemetry/telemetry-schema.json.",
+  "type": "object",
+  "required": [
+    "request_id_hash",
+    "event_id",
+    "event_id_composition",
+    "causal_interrupt_seq",
+    "event_type",
+    "attempt_number",
+    "start_monotonic_ms",
+    "end_monotonic_ms",
+    "utc_correlation_timestamp",
+    "evidence_status",
+    "provider_generation_evidence",
+    "status",
+    "model"
+  ],
+  "properties": {
+    "request_id_hash": {"type": "string", "minLength": 16},
+    "event_id": {"type": "string", "minLength": 16},
+    "event_id_composition": {
+      "type": "array",
+      "prefixItems": [
+        {"type": "string"},
+        {"type": "integer", "minimum": 0},
+        {"type": "integer", "minimum": 0},
+        {"type": "string"}
+      ],
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "parent_event_id": {"type": ["string", "null"]},
+    "causal_interrupt_seq": {"type": "integer", "minimum": 0},
+    "event_type": {
+      "enum": [
+        "anchor_interrupt",
+        "anchor_transport_attempt",
+        "anchor_provider_response",
+        "model_transport_attempt",
+        "model_provider_response"
+      ]
+    },
+    "provider_request_id_redacted": {"type": ["string", "null"]},
+    "attempt_number": {"type": "integer", "minimum": 0},
+    "start_monotonic_ms": {"type": "number", "minimum": 0},
+    "end_monotonic_ms": {"type": "number", "minimum": 0},
+    "utc_correlation_timestamp": {"type": "string", "format": "date-time"},
+    "queue_wait_ms": {"type": ["number", "null"], "minimum": 0},
+    "ttft_ms": {"type": ["number", "null"], "minimum": 0},
+    "tpot_ms_per_token": {"type": ["number", "null"], "minimum": 0},
+    "input_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "input_token_basis": {"enum": ["returned", "billed", "estimated", null]},
+    "output_tokens": {"type": ["integer", "null"], "minimum": 0},
+    "output_token_basis": {"enum": ["returned", "billed", "estimated", null]},
+    "evidence_status": {"enum": ["observed", "provider-confirmed", "estimated", "unknown"]},
+    "provider_generation_evidence": {"enum": ["CONFIRMED", "UNKNOWN", "UNAVAILABLE", null]},
+    "provider_generation_unknown_reason": {
+      "enum": [
+        "TIMEOUT_OUTCOME_UNKNOWN",
+        "TRANSPORT_ERROR",
+        "PROVIDER_RESPONSE_MALFORMED",
+        "BILLING_FEED_MISSING",
+        null
+      ]
+    },
+    "status": {"type": "string", "minLength": 1},
+    "http_status": {"type": ["integer", "null"]},
+    "retry_reason": {"type": ["string", "null"]},
+    "model": {"type": ["string", "null"]},
+    "region": {"type": ["string", "null"]},
+    "price_tier": {"type": ["string", "null"]},
+    "benchmark_run_id": {"type": ["string", "null"]},
+    "task_id": {"type": ["string", "null"]},
+    "row_index": {"type": ["integer", "null"], "minimum": 0},
+    "condition": {"type": ["string", "null"]},
+    "call_kind": {"type": ["string", "null"]},
+    "ingest_replay_mark": {"type": "boolean"},
+    "ingest_conflict_flag": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}
