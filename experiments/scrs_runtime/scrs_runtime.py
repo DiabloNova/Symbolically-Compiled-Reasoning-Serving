@@ -57,7 +57,7 @@ def task_contract_version(task_id: str, info: dict[str, Any], revision: str) -> 
         "task_id": task_id,
         "revision": revision,
         "task_kind": info.get("task_kind"),
-        "task_description": info.get("task_description"),
+        "task_description": task_description(task_id, info),
         "labels": info.get("labels"),
         "task_page": info.get("task_page"),
         "schema_version": 1,
@@ -210,13 +210,27 @@ def validate_capsule(capsule: dict[str, Any], graph: dict[str, Any], task_id: st
         ("CHECK_CAPSULE_SCHEMA", capsule.get("capsule_schema_version") == CAPSULE_SCHEMA_VERSION
          and graph.get("graph_schema_version") == GRAPH_SCHEMA_VERSION
          and isinstance(capsule.get("payload"), dict)
-         and all(isinstance(capsule["payload"].get(k), list) for k in CAPSULE_FIELDS)
+         and set(capsule["payload"]) == set(CAPSULE_FIELDS)
+         and all(
+             isinstance(capsule["payload"].get(k), list)
+             and len(capsule["payload"][k]) <= 32
+             and all(isinstance(item, str) and item.strip() and len(item) <= 800
+                     for item in capsule["payload"][k])
+             for k in CAPSULE_FIELDS
+         )
+         and len(canonical_json(capsule["payload"])) <= 8000
          and bool(capsule["payload"].get("decision_relevant_facts")), "Capsule schema invalid."),
-        ("CHECK_GRAPH_ORDER", [n.get("op") for n in graph.get("nodes", [])] == [
-            "CHECK_TASK_ID", "CHECK_CONTRACT_VERSION", "CHECK_UPSTREAM_REVISION",
-            "CHECK_SOURCE_PROVENANCE", "CHECK_ALLOWED_LABEL_INVENTORY",
-            "CHECK_CAPSULE_SCHEMA", "RENDER_WITH_ANCHOR_HINT"
-        ], "Graph nodes missing, reordered, or replaced."),
+        ("CHECK_GRAPH_ORDER",
+         graph.get("graph_id") == "scrs-legalbench-decision-graph-v1"
+         and [n.get("id") for n in graph.get("nodes", [])] == ["N1", "N2", "N3", "N4", "N5", "N6", "N7"]
+         and [n.get("op") for n in graph.get("nodes", [])] == [
+             "CHECK_TASK_ID", "CHECK_CONTRACT_VERSION", "CHECK_UPSTREAM_REVISION",
+             "CHECK_SOURCE_PROVENANCE", "CHECK_ALLOWED_LABEL_INVENTORY",
+             "CHECK_CAPSULE_SCHEMA", "RENDER_WITH_ANCHOR_HINT"
+         ]
+         and all(n.get("on_fail") == "FALLBACK" for n in graph.get("nodes", [])[:-1])
+         and graph.get("nodes", [{}])[-1].get("terminal") == "FAST_PATH",
+         "Graph nodes missing, reordered, or replaced."),
     ]
     trace = []
     accepted = True
