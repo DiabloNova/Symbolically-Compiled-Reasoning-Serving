@@ -62,7 +62,25 @@
       "tasks_selected": 6,
       "predictions_generated": false,
       "archive_sha256": "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a"
-    }
+    },
+    "mock_pipeline": "passed_synthetic_integration_smoke_test",
+    "mock_pipeline_ci": "https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/actions/runs/40275662869",
+    "mock_pipeline_result": {
+      "run_status": "MOCK_SIMULATION_COMPLETED",
+      "verified_commit": "570a86055d9402947002a885df4667e6e8e0bb38",
+      "selected_tasks": 6,
+      "cases_exercised": 12,
+      "condition_predictions_written": 36,
+      "mock_api_requests": 60,
+      "mock_api_request_errors": 0,
+      "valid_synthetic_capsules": 12,
+      "external_provider_calls": 0,
+      "model_predictions_generated": false,
+      "benchmark_accuracy_reported": false,
+      "evidence_boundary": "Local deterministic fixtures only; integration evidence, not empirical model results. Accuracy, semantic preservation, token use, cost, and latency claims remain unmeasured."
+    },
+    "metrics_return_regression": "fixed_and_tested",
+    "metrics_return_regression_test": "tests/test_scrs_runner_metrics.py"
   },
   "tasks": [
     {
