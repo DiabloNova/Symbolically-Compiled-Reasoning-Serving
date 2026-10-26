@@ -67,6 +67,7 @@ class OpenAICompatibleClient:
         timeout_seconds: float = 60.0,
         max_retries: int = 2,
         allow_unauthenticated: bool = False,
+        max_token_parameter: str | None = None,
     ) -> None:
         base_url = (base_url or "").strip().rstrip("/")
         model = (model or "").strip()
@@ -88,12 +89,29 @@ class OpenAICompatibleClient:
         if parsed.scheme != "https" and not is_loopback:
             raise ProviderConfigurationError("Non-loopback provider endpoints must use HTTPS.")
 
+        if max_token_parameter is not None and max_token_parameter not in {"max_tokens", "max_completion_tokens"}:
+            raise ProviderConfigurationError(
+                "max_token_parameter must be max_tokens or max_completion_tokens."
+            )
+        is_openai_api = parsed.hostname == "api.openai.com"
+        selected_token_parameter = max_token_parameter or (
+            "max_completion_tokens" if is_openai_api else "max_tokens"
+        )
+        # Current OpenAI reasoning-model families (o-series and GPT-5+) reject
+        # temperature and use developer-role instructions in place of system.
+        model_lower = model.casefold()
+        openai_reasoning_family = is_openai_api and (
+            model_lower.startswith(("o1", "o3", "o4", "gpt-5"))
+        )
         self.base_url = base_url
         self.model = model
         self.api_key = (api_key or "").strip()
         self.role = role
         self.timeout_seconds = float(timeout_seconds)
         self.max_retries = int(max_retries)
+        self.max_token_parameter = selected_token_parameter
+        self.is_openai_api = is_openai_api
+        self.openai_reasoning_family = openai_reasoning_family
 
     @classmethod
     def from_env(cls, role: str = "render") -> "OpenAICompatibleClient":
@@ -118,6 +136,7 @@ class OpenAICompatibleClient:
         allow_unauthenticated = os.getenv("SCRS_ALLOW_UNAUTHENTICATED_ENDPOINT", "").lower() == "true"
         timeout = float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60"))
         retries = int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2"))
+        token_parameter = os.getenv("SCRS_MAX_TOKEN_PARAMETER") or None
         return cls(
             base_url=base_url,
             model=model,
@@ -126,6 +145,7 @@ class OpenAICompatibleClient:
             timeout_seconds=timeout,
             max_retries=retries,
             allow_unauthenticated=allow_unauthenticated,
+            max_token_parameter=token_parameter,
         )
 
     def _event_id(self, request_id_hash: str, sequence: int, attempt: int, event_type: str) -> str:
@@ -154,14 +174,22 @@ class OpenAICompatibleClient:
             raise ValueError("messages must contain role/content string objects.")
 
         url = self.base_url + "/chat/completions"
+        request_messages = messages
+        if self.openai_reasoning_family:
+            request_messages = [
+                {**message, "role": "developer"} if message.get("role") == "system" else message
+                for message in messages
+            ]
+        payload_object = {
+            "model": self.model,
+            "messages": request_messages,
+            self.max_token_parameter: max_tokens,
+            "stream": False,
+        }
+        if not self.openai_reasoning_family:
+            payload_object["temperature"] = temperature
         payload = json.dumps(
-            {
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "stream": False,
-            },
+            payload_object,
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
