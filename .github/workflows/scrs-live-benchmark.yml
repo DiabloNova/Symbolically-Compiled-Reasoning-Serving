@@ -8,6 +8,7 @@ on:
       - ".github/workflows/scrs-live-benchmark.yml"
       - "data/manifests/legalbench.json"
       - "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz"
+      - "results/public-benchmarks/experiment-plan.v1.json"
   workflow_dispatch:
     inputs:
       tasks:
