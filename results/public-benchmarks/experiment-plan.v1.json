@@ -47,9 +47,22 @@
     "capsule_only_predictions": "not_generated",
     "compiled_graph_predictions": "not_generated",
     "scored_reports": "none",
-    "blocker": "The runnable paired reference adapter and bounded Anchor client are now in the research branch. Actual predictions require SCRS_API_KEY and an exact SCRS_MODEL. Do not synthesize predictions if provider configuration is unavailable; a small configured pilot must complete before predictions can be scored.",
+    "blocker": "Runtime and Anchor client are implemented and offline-validated. The model comparison cannot produce live predictions until a repository Actions secret SCRS_API_KEY and a model ID SCRS_MODEL are configured; for official OpenAI GPT-5+/o-series, use a compatible max_completion_tokens/developer-role request and configure a suitable Anchor model/effort for the five-token cap. Do not synthesize placeholder predictions.",
     "reference_runner": "implemented_in_experiments/scrs_runtime; not a production SCRS runtime",
-    "anchor_client": "instrumented OpenAI-compatible HTTP client; live call tests are mocked unless the provider is configured"
+    "anchor_client": "instrumented OpenAI-compatible HTTP client; live call tests are mocked unless the provider is configured",
+    "offline_runtime_tests": "20_passed_on_2026-10-26",
+    "offline_runtime_ci": "https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/actions/runs/40256075735",
+    "data_integrity_ci": "https://github.com/DiabloNova/Symbolically-Compiled-Reasoning-Serving/actions/runs/40256075809",
+    "live_pilot": "skipped_missing_github_actions_provider_configuration",
+    "live_pilot_skip_evidence": "The conditional PR workflow checked for SCRS_API_KEY and SCRS_MODEL, found both unset, and skipped the live-prediction step. No baseline, capsule-only, or compiled-graph model predictions were generated.",
+    "last_validation_only_run": {
+      "commit": "aac1bdff5f6a2b57aa236fb7f97117e7e552508d",
+      "run_status": "VALIDATION_ONLY",
+      "selected_rows_per_task": 2,
+      "tasks_selected": 6,
+      "predictions_generated": false,
+      "archive_sha256": "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a"
+    }
   },
   "tasks": [
     {
