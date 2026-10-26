@@ -84,6 +84,17 @@ def mark_outputs_as_mock(out_dir: Path, server: MockApiServer, tasks: list[str],
                 case = json.loads(line)
                 case["execution_mode"] = "LOCAL_MOCK_API_SIMULATION"
                 case["prediction_evidence"] = "SYNTHETIC_FIXTURE_NOT_MODEL_INFERENCE"
+                for calls in case.get("call_usage_by_condition", {}).values():
+                    for call in calls:
+                        if not isinstance(call, dict):
+                            continue
+                        call["execution_mode"] = "LOCAL_MOCK_API_SIMULATION"
+                        call["usage"] = None
+                        call["usage_evidence"] = "UNAVAILABLE"
+                        for attempt in call.get("attempts", []):
+                            attempt["provider_generation_evidence"] = "UNAVAILABLE"
+                            attempt["provider_generation_unknown_reason"] = None
+                            attempt["evidence_scope"] = "mock HTTP response; not provider generation"
                 cases.append(case)
         cases_path.write_text(
             "".join(json.dumps(case, ensure_ascii=False, sort_keys=True) + "\n" for case in cases),
@@ -216,8 +227,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         # Suppress the live runner's accuracy summary; mock quality metrics are
         # intentionally not part of this run's user-facing output.
-        with contextlib.redirect_stdout(open(os.devnull, "w", encoding="utf-8")):
-            result = run_legalbench.main(runner_args)
+        with open(os.devnull, "w", encoding="utf-8") as sink:
+            with contextlib.redirect_stdout(sink):
+                result = run_legalbench.main(runner_args)
         if result != 0:
             return result
         task_ids = [part.strip() for part in args.tasks.split(",") if part.strip()] if args.tasks.lower() != "all" else []
