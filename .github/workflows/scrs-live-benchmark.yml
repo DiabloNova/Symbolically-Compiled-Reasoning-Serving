@@ -5,6 +5,7 @@ on:
     paths:
       - "experiments/scrs_runtime/**"
       - "tests/test_scrs_live_runtime.py"
+      - "tests/test_scrs_mock_api.py"
       - ".github/workflows/scrs-live-benchmark.yml"
       - "data/manifests/legalbench.json"
       - "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz"
@@ -53,7 +54,10 @@ jobs:
           experiments/scrs_runtime/anchor_client.py
           experiments/scrs_runtime/scrs_runtime.py
           experiments/scrs_runtime/run_legalbench.py
+          experiments/scrs_runtime/mock_api.py
+          experiments/scrs_runtime/run_mock_benchmark.py
           tests/test_scrs_live_runtime.py
+          tests/test_scrs_mock_api.py
       - name: Run offline runtime and Anchor client tests
         run: python -m unittest discover -s tests -p "test_scrs_live_runtime.py" -v
       - name: Validate experiment event schema
@@ -168,5 +172,62 @@ jobs:
         with:
           name: scrs-live-pilot-${{ github.run_id }}
           path: results/public-benchmarks/live-runs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  mock-pipeline-smoke-test:
+    if: github.event_name == 'pull_request'
+    needs: offline-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test synthetic API contracts
+        run: python -m unittest discover -s tests -p "test_scrs_mock_api.py" -v
+      - name: Execute complete pipeline against local mock API
+        run: >-
+          python experiments/scrs_runtime/run_mock_benchmark.py
+          --tasks all --max-examples 2
+          --output-root "results/public-benchmarks/mock-runs"
+          --run-id "ci-mock"
+      - name: Assert synthetic evidence boundaries
+        env:
+          MOCK_OUTPUT: "results/public-benchmarks/mock-runs/ci-mock"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["MOCK_OUTPUT"])
+          report = json.loads((root / "mock-diagnostics.json").read_text())
+          assert report["run_status"] == "MOCK_SIMULATION_COMPLETED", report
+          assert report["cases_exercised"] == 12, report
+          assert report["prediction_files_written"] == 18, report
+          assert report["condition_predictions_written"] == 36, report
+          assert report["mock_api_requests"] > 0, report
+          assert report["external_provider_calls"] == 0, report
+          assert report["model_predictions_generated"] is False, report
+          assert report["benchmark_accuracy_reported"] is False, report
+          assert not (root / "metrics.json").exists(), "Mock accuracy metrics must not be published."
+          assert (root / "predictions").is_dir()
+          assert (root / "traces").is_dir()
+          assert (root / "events.jsonl").is_file()
+          for path in (root / "predictions").glob("*/*.json"):
+              item = json.loads(path.read_text())
+              assert item["prediction_evidence"] == "SYNTHETIC_FIXTURE_NOT_MODEL_INFERENCE"
+          print("Mock pipeline passed: synthetic outputs clearly labeled; no model accuracy reported.")
+          PY
+      - name: Upload mock diagnostics and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrs-mock-pipeline-${{ github.run_id }}
+          path: results/public-benchmarks/mock-runs/ci-mock/
           if-no-files-found: warn
           retention-days: 30
