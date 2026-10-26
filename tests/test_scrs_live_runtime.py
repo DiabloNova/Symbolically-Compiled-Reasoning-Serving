@@ -186,6 +186,36 @@ class AnchorClientTests(unittest.TestCase):
         sent_request = urlopen_mock.call_args.args[0]
         self.assertEqual(sent_request.full_url, "http://localhost:8000/v1/chat/completions")
 
+
+    @patch("experiments.scrs_runtime.anchor_client.urlopen")
+    def test_openai_reasoning_model_uses_current_token_parameter_and_developer_role(self, urlopen_mock):
+        urlopen_mock.return_value = FakeResponse(provider_payload("generic"))
+        client = OpenAICompatibleClient(
+            base_url="https://api.openai.com/v1",
+            model="gpt-5.2",
+            api_key="test-key",
+            role="render",
+            timeout_seconds=1,
+            max_retries=0,
+        )
+        result = client.chat(
+            messages=[
+                {"role": "system", "content": "system instruction"},
+                {"role": "user", "content": "label this"},
+            ],
+            request_id_hash="e" * 32,
+            causal_interrupt_seq=7,
+            max_tokens=16,
+            temperature=0.0,
+        )
+        request_obj = urlopen_mock.call_args.args[0]
+        sent = json.loads(request_obj.data.decode("utf-8"))
+        self.assertIn("max_completion_tokens", sent)
+        self.assertNotIn("max_tokens", sent)
+        self.assertNotIn("temperature", sent)
+        self.assertEqual(sent["messages"][0]["role"], "developer")
+        self.assertEqual(result.content, "generic")
+
     @patch("experiments.scrs_runtime.anchor_client.time.sleep")
     @patch("experiments.scrs_runtime.anchor_client.urlopen")
     def test_timeout_is_unknown_then_retry_success_is_confirmed(self, urlopen_mock, sleep_mock):
