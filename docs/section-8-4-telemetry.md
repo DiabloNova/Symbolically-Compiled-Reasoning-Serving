@@ -33,3 +33,8 @@ Request-level and event-level records must be joined before calculating counts, 
 ## Privacy and latency validity
 
 Do not log API keys, raw prompts, full responses, or unredacted user identifiers. Document sampling, clock assumptions, provider-side visibility limits, missing telemetry, software versions, and the exact aggregation procedure. End-to-end latency alone cannot reconstruct queue wait, TTFT, TPOT, retries, Anchor calls, or overlap between local generation and remote calls. P50/P95 claims must be computed from event-linked request traces or clearly labelled simulation output.
+
+
+## Offline contract-checker boundary
+
+The repository now includes an offline CSV checker at telemetry/validate_telemetry.py and standard-library test cases under tests/test_telemetry_validation.py. The checker validates internal consistency between request counters and deduplicated event rows, requires reason codes for unknown provider outcomes, rejects contradictory fallback summaries, and prevents unavailable billing from being encoded as a numeric zero. Its passing tests validate the declared telemetry contract against constructed cases only; they do not demonstrate that a production runtime emits these records or that the Anchor client/provider behaves as simulated. Source-level instrumentation and a run against actual request-linked traces remain pending.

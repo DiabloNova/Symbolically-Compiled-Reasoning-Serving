@@ -16,3 +16,10 @@
 
 ## Required next step
 Instrument the implementation or provide its repository and anonymized event logs. Record request-linked events with provider request IDs (redacted), queue start/end, first-token time, token count, completion time, retry/cancellation status, SLM active-generation spans, halt time, and fallback spans.
+
+
+## Repository-source checkpoint — 2026-10-25
+
+The main-branch recursive source inventory was reviewed before attempting client-level instrumentation. The repository contains the manuscript, pseudocode, Python analysis/recalculation scripts, the abstract cross-domain gate, telemetry schema/templates, and public-data/evaluation tooling. It does **not** contain an identifiable SCRS runtime or Anchor HTTP/API transport-client implementation. Therefore the source-level pseudocode still shows one logical generationAnchors invocation per interrupt, but actual round trips, retries, batching, cache behaviour, cancellation, confirmed provider generations, and billed tokens remain unverified. This is a repository-scoped finding; it does not establish that no implementation exists elsewhere.
+
+An offline telemetry contract checker and 17 reference tests are added in this branch. They check counter/event reconciliation and error-state handling but use constructed fixtures; they are not production conformance evidence. Required unblocker: provide the runtime/client source location and anonymized request-linked client/provider event records.
