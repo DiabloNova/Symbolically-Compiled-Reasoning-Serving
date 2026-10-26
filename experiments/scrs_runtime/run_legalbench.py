@@ -292,6 +292,61 @@ def metrics_for(task_id: str, rows: list[dict[str, Any]], predictions: list[dict
         ci = [max(0.0, center - margin), min(1.0, center + margin)]
     else:
         ci = None
+
+def condition_usage_metrics(task_id: str, condition: str, cases: list[dict[str, Any]]) -> dict[str, Any]:
+    relevant = [case for case in cases if case.get("task_id") == task_id]
+    request_latencies: list[float] = []
+    total_attempts = 0
+    total_confirmed = 0
+    total_input = 0
+    total_output = 0
+    usage_available_calls = 0
+    provider_calls = 0
+    for case in relevant:
+        path_calls = case.get("call_usage_by_condition", {}).get(condition, [])
+        actual_call_rows = [call for call in path_calls if isinstance(call, dict) and "attempt_count" in call]
+        provider_calls += len(actual_call_rows)
+        total_attempts += sum(int(call.get("attempt_count", 0)) for call in actual_call_rows)
+        latency_sum = 0.0
+        for call in actual_call_rows:
+            latency_sum += float(call.get("duration_ms") or 0.0)
+            usage = call.get("usage")
+            if isinstance(usage, dict):
+                usage_available_calls += 1
+                total_input += int(usage.get("input_tokens", 0))
+                total_output += int(usage.get("output_tokens", 0))
+            for attempt in call.get("attempts", []):
+                if attempt.get("provider_generation_evidence") == "CONFIRMED":
+                    total_confirmed += 1
+        request_latencies.append(latency_sum)
+
+    def percentile(values: list[float], fraction: float) -> float | None:
+        if not values:
+            return None
+        ordered = sorted(values)
+        index = max(0, min(len(ordered) - 1, int((len(ordered) * fraction) + 0.999999) - 1))
+        return round(ordered[index], 3)
+
+    n = len(relevant)
+    return {
+        "provider_calls_in_counterfactual_path": provider_calls,
+        "transport_attempts": total_attempts,
+        "confirmed_generations_from_attempt_evidence": total_confirmed,
+        "provider_reported_input_tokens": total_input if usage_available_calls else None,
+        "provider_reported_output_tokens": total_output if usage_available_calls else None,
+        "calls_with_provider_usage": usage_available_calls,
+        "calls_without_provider_usage": provider_calls - usage_available_calls,
+        "mean_sequential_provider_latency_ms_per_request": round(sum(request_latencies) / len(request_latencies), 3) if request_latencies else None,
+        "p50_sequential_provider_latency_ms_per_request": percentile(request_latencies, 0.50),
+        "p95_sequential_provider_latency_ms_per_request": percentile(request_latencies, 0.95),
+        "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+        "usage_allocation": (
+            "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; "
+            "the run-level provider total counts it once"
+        ),
+    }
+
+
     return {
         "task_id": task_id,
         "n": n,
@@ -455,6 +510,13 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     build_capsule_messages(task_id, description, labels, task_record["input_fields"]),
                     "capsule_extraction", "capsule_only", capsule_tokens, seq
                 )
+                # The physical extraction call is shared across the two compressed paths.
+                # Its usage is allocated to both counterfactual path budgets, while the run total
+                # counts the actual provider request exactly once.
+                shared_capsule_call = dict(calls_by_condition["capsule_only"][-1])
+                shared_capsule_call["condition"] = "compiled_graph_gates"
+                shared_capsule_call["cost_allocation"] = "shared_preprocessing_counterfactual"
+                calls_by_condition["compiled_graph_gates"].append(shared_capsule_call)
                 try:
                     payload = parse_capsule_payload(capsule_result.content)
                     capsule = create_capsule(task_id, task_record["task_contract_version"], revision,
@@ -583,6 +645,7 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                         } for condition in CONDITIONS
                     },
                     "elapsed_wall_ms": round((time.monotonic() - case_start) * 1000, 3),
+                    "call_usage_by_condition": calls_by_condition,
                     "usage_attribution_policy": (
                         "Capsule extraction usage is included in each compressed condition's per-path "
                         "usage summary; run-level provider usage counts the shared extraction call once."
@@ -621,6 +684,9 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
             preds = all_results[task_id][condition]
             metrics[task_id][condition] = metrics_for(
                 task_id, selected_rows, preds, task_manifest["task_allowlist"][task_id]["labels"]
+            )
+            metrics[task_id][condition]["provider_usage_and_latency"] = condition_usage_metrics(
+                task_id, condition, all_cases
             )
             # Use the strict existing scorer as a second check when every prediction
             # is a valid label; otherwise keep the custom metrics and make strict score non-publishable.
