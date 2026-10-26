@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "plan_id": "scrs-legalbench-six-task-v1",
-  "status": "preregistered_data_ready_model_runs_not_yet_executed",
+  "status": "preregistered_data_ready_reference_runner_added_model_runs_not_yet_executed",
   "created_at": "2026-10-23",
   "purpose": "Define reproducible, task-specific comparison conditions without inventing predictions or mixing empirical measurements with simulation.",
   "source": {
@@ -47,7 +47,9 @@
     "capsule_only_predictions": "not_generated",
     "compiled_graph_predictions": "not_generated",
     "scored_reports": "none",
-    "blocker": "No end-to-end runnable and verified set of original-context, capsule-only, and compiled-graph/gates prediction adapters plus execution traces has been produced in this stage. Do not synthesize placeholder predictions."
+    "blocker": "The runnable paired reference adapter and bounded Anchor client are now in the research branch. Actual predictions require SCRS_API_KEY and an exact SCRS_MODEL. Do not synthesize predictions if provider configuration is unavailable; a small configured pilot must complete before predictions can be scored.",
+    "reference_runner": "implemented_in_experiments/scrs_runtime; not a production SCRS runtime",
+    "anchor_client": "instrumented OpenAI-compatible HTTP client; live call tests are mocked unless the provider is configured"
   },
   "tasks": [
     {
@@ -65,22 +67,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
@@ -110,22 +112,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
@@ -155,22 +157,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
@@ -205,22 +207,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
@@ -250,22 +252,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
@@ -295,22 +297,22 @@
       "licence": "CC BY 4.0",
       "source_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
       "evaluation_split": "test",
-      "status": "data_ready_predictions_not_generated",
+      "status": "reference_runner_added_predictions_not_generated",
       "conditions": [
         {
           "id": "original_context",
           "required_input": "Original upstream context and question",
-          "status": "blocked_until_model_runner_is_available"
+          "status": "implemented_ready_for_live_inference_with_provider_credentials"
         },
         {
           "id": "capsule_only",
           "required_input": "Capsule from a pinned, runnable SCRS extractor",
-          "status": "blocked_until_verified_extractor_is_available"
+          "status": "capsule_extractor_and_capsule_only_classifier_implemented_requires_provider_credentials"
         },
         {
           "id": "capsule_compiled_graph_gates",
           "required_input": "Capsule plus a pinned compiled graph and explicit compatibility gates",
-          "status": "blocked_until_verified_scrs_execution_path_is_available"
+          "status": "reference_graph_gates_and_anchor_renderer_implemented_requires_provider_credentials"
         }
       ],
       "prediction_file_schema": {
