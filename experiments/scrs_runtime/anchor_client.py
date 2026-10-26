@@ -24,7 +24,12 @@ class ProviderConfigurationError(RuntimeError):
 
 
 class ProviderRequestError(RuntimeError):
-    """A provider request failed after the declared retry policy."""
+    """A provider request failed and carries its captured attempt evidence."""
+
+    def __init__(self, message: str, *, attempts=None, events=None):
+        super().__init__(message)
+        self.attempts = list(attempts or [])
+        self.events = list(events or [])
 
 
 def _sha(value: str) -> str:
@@ -233,7 +238,9 @@ class OpenAICompatibleClient:
                                                start_ms, started, status, http_status, provider_evidence,
                                                unknown_reason, retry_reason, returned_request_id, None)
                     raise ProviderRequestError(
-                        f"{self.role} provider returned HTTP {exc.code}; response body intentionally omitted."
+                        f"{self.role} provider returned HTTP {exc.code}; response body intentionally omitted.",
+                        attempts=attempts,
+                        events=events,
                     ) from None
             except (TimeoutError, socket.timeout):
                 status = "timeout"
@@ -242,13 +249,19 @@ class OpenAICompatibleClient:
                 last_error = "timeout outcome unknown"
                 if attempt_number <= self.max_retries:
                     retry_reason = "TIMEOUT"
-            except URLError:
-                status = "transport_error"
-                provider_evidence = "UNKNOWN"
-                unknown_reason = "TRANSPORT_ERROR"
-                last_error = "transport error"
-                if attempt_number <= self.max_retries:
-                    retry_reason = "TRANSPORT_ERROR"
+            except URLError as exc:
+                if isinstance(getattr(exc, "reason", None), (TimeoutError, socket.timeout)):
+                    status = "timeout"
+                    provider_evidence = "UNKNOWN"
+                    unknown_reason = "TIMEOUT_OUTCOME_UNKNOWN"
+                    last_error = "timeout outcome unknown"
+                    retry_reason = "TIMEOUT" if attempt_number <= self.max_retries else None
+                else:
+                    status = "transport_error"
+                    provider_evidence = "UNKNOWN"
+                    unknown_reason = "TRANSPORT_ERROR"
+                    last_error = "transport error"
+                    retry_reason = "TRANSPORT_ERROR" if attempt_number <= self.max_retries else None
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
                 status = "malformed_response"
                 provider_evidence = "UNKNOWN"
@@ -288,9 +301,17 @@ class OpenAICompatibleClient:
                 time.sleep(min(0.25 * (2 ** (attempt_number - 1)), 2.0))
                 continue
 
-            raise ProviderRequestError(f"{self.role} provider failed: {last_error}; response body omitted.")
+            raise ProviderRequestError(
+                f"{self.role} provider failed: {last_error}; response body omitted.",
+                attempts=attempts,
+                events=events,
+            )
 
-        raise ProviderRequestError(f"{self.role} provider failed after retries: {last_error}.")
+        raise ProviderRequestError(
+            f"{self.role} provider failed after retries: {last_error}.",
+            attempts=attempts,
+            events=events,
+        )
 
     def _append_attempt_event(
         self,
