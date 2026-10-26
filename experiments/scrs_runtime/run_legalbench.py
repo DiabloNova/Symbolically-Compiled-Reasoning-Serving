@@ -469,14 +469,44 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                        condition: str, max_tokens: int, sequence: int):
                 nonlocal total_provider_calls, total_confirmed_generations
                 nonlocal total_reported_input_tokens, total_reported_output_tokens
-                result = client.chat(
-                    messages=messages,
-                    request_id_hash=request_hash,
-                    causal_interrupt_seq=sequence,
-                    max_tokens=max_tokens,
-                    temperature=0.0,
-                )
-                total_provider_calls += result.attempts.__len__()
+                try:
+                    result = client.chat(
+                        messages=messages,
+                        request_id_hash=request_hash,
+                        causal_interrupt_seq=sequence,
+                        max_tokens=max_tokens,
+                        temperature=0.0,
+                    )
+                except ProviderRequestError as exc:
+                    failed_attempts = list(getattr(exc, "attempts", []))
+                    failed_events = list(getattr(exc, "events", []))
+                    total_provider_calls += len(failed_attempts)
+                    total_confirmed_generations += sum(
+                        1 for e in failed_events if e.get("event_type") in {
+                            "model_provider_response", "anchor_provider_response"
+                        }
+                    )
+                    append_jsonl(
+                        event_path,
+                        annotate_events(failed_events, run_id, task_id, row["index"], condition, call_kind),
+                    )
+                    calls_by_condition[condition].append({
+                        "call_kind": call_kind,
+                        "condition": condition,
+                        "causal_sequence": sequence,
+                        "model": client.model,
+                        "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
+                        "attempt_count": len(failed_attempts),
+                        "attempts": failed_attempts,
+                        "usage": None,
+                        "usage_evidence": "UNAVAILABLE",
+                        "provider_request_id_hash": None,
+                        "prompt_sha256": digest_text(canonical_json(messages)),
+                        "request_id_hash": request_hash,
+                        "status": "FAILED_PROVIDER_REQUEST",
+                    })
+                    raise
+                total_provider_calls += len(result.attempts)
                 total_confirmed_generations += sum(
                     1 for e in result.events if e.get("event_type") in {"model_provider_response", "anchor_provider_response"}
                 )
@@ -574,14 +604,49 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     # transport retries and provider generations are separately logged.
                     logical_start = time.monotonic() * 1000
                     seq += 1
-                    anchor_result = anchor_client.generate_anchors(
-                        task_description=description,
-                        allowed_labels=labels,
-                        capsule=capsule["payload"],
-                        graph_trace=gate_trace,
-                        request_id_hash=request_hash,
-                        causal_interrupt_seq=seq,
-                    )
+                    try:
+                        anchor_result = anchor_client.generate_anchors(
+                            task_description=description,
+                            allowed_labels=labels,
+                            capsule=capsule["payload"],
+                            graph_trace=gate_trace,
+                            request_id_hash=request_hash,
+                            causal_interrupt_seq=seq,
+                        )
+                    except ProviderRequestError as exc:
+                        logical_end = time.monotonic() * 1000
+                        logical = logical_interrupt_event(
+                            request_hash, seq, run_id, task_id, row["index"], logical_start, logical_end
+                        )
+                        failed_events = annotate_events(
+                            list(getattr(exc, "events", [])), run_id, task_id,
+                            row["index"], "compiled_graph_gates", "anchor_generation"
+                        )
+                        append_jsonl(event_path, [logical, *failed_events])
+                        failed_attempts = list(getattr(exc, "attempts", []))
+                        total_provider_calls += len(failed_attempts)
+                        total_confirmed_generations += sum(
+                            1 for e in failed_events if e.get("event_type") == "anchor_provider_response"
+                        )
+                        calls_by_condition["compiled_graph_gates"].append({
+                            "call_kind": "anchor_generation",
+                            "condition": "compiled_graph_gates",
+                            "causal_sequence": seq,
+                            "model": anchor_provider.model,
+                            "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
+                            "attempt_count": len(failed_attempts),
+                            "attempts": failed_attempts,
+                            "usage": None,
+                            "usage_evidence": "UNAVAILABLE",
+                            "provider_request_id_hash": None,
+                            "prompt_sha256": digest_text(canonical_json({
+                                "task": description, "allowed_labels": labels,
+                                "capsule": capsule["payload"], "verified_graph_trace": gate_trace,
+                            })),
+                            "request_id_hash": request_hash,
+                            "status": "FAILED_PROVIDER_REQUEST",
+                        })
+                        raise
                     logical_end = time.monotonic() * 1000
                     logical = logical_interrupt_event(request_hash, seq, run_id, task_id, row["index"],
                                                       logical_start, logical_end)
