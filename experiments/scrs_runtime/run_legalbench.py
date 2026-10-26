@@ -598,7 +598,16 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     calls_by_condition["compiled_graph_gates"].append(
                         call_record(anchor_result, "anchor_generation", "compiled_graph_gates", seq)
                     )
-                    calls_by_condition["compiled_graph_gates"][-1]["prompt_sha256"] = "redacted-anchor-prompt-hash-not-persisted"
+                    calls_by_condition["compiled_graph_gates"][-1]["prompt_sha256"] = digest_text(canonical_json({
+                        "task": description,
+                        "allowed_labels": labels,
+                        "capsule": capsule["payload"],
+                        "verified_graph_trace": gate_trace,
+                        "instruction": (
+                            "Return a compact anchor hint of at most five tokens; do not return a full answer, "
+                            "do not invent facts, and do not include chain-of-thought. If evidence is insufficient, return UNKNOWN."
+                        ),
+                    }))
                     calls_by_condition["compiled_graph_gates"][-1]["request_id_hash"] = request_hash
 
                     seq += 1
