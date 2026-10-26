@@ -6,6 +6,7 @@ on:
       - "experiments/scrs_runtime/**"
       - "tests/test_scrs_live_runtime.py"
       - "tests/test_scrs_mock_api.py"
+      - "tests/test_scrs_runner_metrics.py"
       - ".github/workflows/scrs-live-benchmark.yml"
       - "data/manifests/legalbench.json"
       - "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz"
@@ -58,8 +59,11 @@ jobs:
           experiments/scrs_runtime/run_mock_benchmark.py
           tests/test_scrs_live_runtime.py
           tests/test_scrs_mock_api.py
+          tests/test_scrs_runner_metrics.py
       - name: Run offline runtime and Anchor client tests
         run: python -m unittest discover -s tests -p "test_scrs_live_runtime.py" -v
+      - name: Test benchmark metrics return contract
+        run: python -m unittest discover -s tests -p "test_scrs_runner_metrics.py" -v
       - name: Validate experiment event schema
         run: python -m json.tool experiments/scrs_runtime/event-schema.v1.json > /dev/null
       - name: Verify pinned six-task dataset and graph gates
