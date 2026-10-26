@@ -27,6 +27,7 @@ Follow the staged workflow in [Research-to-publication workflow](docs/research-p
 - `docs/research-validation-ledger.md` — claim-to-evidence ledger.
 - `docs/next-steps.md` — evidence-dependent work plan.
 - `experiments/cross_domain_safety/` — abstract gate reference model and 26 conformance tests; not production error-rate evidence.
+- `experiments/scrs_runtime/` — live OpenAI-compatible inference adapter, five-token Anchor client, capsule compiler, fail-closed decision graph, and paired LegalBench runner; a reference prototype, not production SCRS.
 - `telemetry/` — request/event schema, CSV templates, and offline contract validator (`telemetry/README.md`).
 - `results/recalculation-v1/` — current recalculation model, CSV, manifest, and figure generator.
 - `results/scenario-v2/` — historical scenario retained for provenance; it is not the current calculation.
