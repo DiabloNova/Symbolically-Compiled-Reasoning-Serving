@@ -240,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(diagnostic, indent=2, ensure_ascii=False, sort_keys=True))
         return 0
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         print(f"Mock benchmark failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     finally:
