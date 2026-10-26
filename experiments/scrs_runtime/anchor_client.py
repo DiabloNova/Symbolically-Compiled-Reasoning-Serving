@@ -100,7 +100,7 @@ class OpenAICompatibleClient:
         }.get(role)
         if prefix is None:
             raise ProviderConfigurationError(f"Unknown client role: {role!r}")
-        base_url = os.getenv(f"{prefix}_BASE_URL") or os.getenv("SCRS_BASE_URL", "https://api.openai.com/v1")
+        base_url = os.getenv(f"{prefix}_BASE_URL") or os.getenv("SCRS_BASE_URL") or "https://api.openai.com/v1"
         model = (
             os.getenv(f"{prefix}_MODEL")
             or os.getenv("SCRS_MODEL", "")
