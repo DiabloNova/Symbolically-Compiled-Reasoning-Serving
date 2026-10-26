@@ -309,3 +309,24 @@ def parse_label(content: str, labels: list[str]) -> str | None:
             if folded == label.casefold():
                 return label
     return None
+
+
+def build_task_record(task_id: str, index: int, fields: dict[str, Any],
+                      task_info: dict[str, Any], upstream_revision: str) -> dict[str, Any]:
+    if not isinstance(index, int) or isinstance(index, bool):
+        raise ValueError("Benchmark row index must be an integer.")
+    record = {"fields": fields}
+    inputs = source_input_fields(record)
+    labels = task_info.get("labels")
+    if not isinstance(labels, list) or not labels or any(not isinstance(x, str) or not x.strip() for x in labels):
+        raise ValueError(f"{task_id}: manifest labels must be non-empty strings.")
+    return {
+        "task_id": task_id,
+        "index": index,
+        "description": task_description(task_id, task_info),
+        "labels": labels,
+        "input_fields": inputs,
+        "source_input_sha256": source_input_hash(inputs),
+        "task_contract_version": task_contract_version(task_id, task_info, upstream_revision),
+        "upstream_revision": upstream_revision,
+    }
