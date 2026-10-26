@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from experiments.scrs_runtime.anchor_client import (
@@ -145,6 +146,13 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertEqual(parse_label("generic", LABELS), "generic")
         self.assertEqual(parse_label('{"prediction": "Common Law"}', ["UCC", "Common Law"]), "Common Law")
         self.assertIsNone(parse_label("The answer is generic because ...", LABELS))
+
+    def test_experiment_event_schema_is_valid_json_and_separates_event_kinds(self):
+        schema_path = Path(__file__).resolve().parents[1] / "experiments" / "scrs_runtime" / "event-schema.v1.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        self.assertIn("anchor_transport_attempt", schema["properties"]["event_type"]["enum"])
+        self.assertIn("model_transport_attempt", schema["properties"]["event_type"]["enum"])
+        self.assertIn("provider_generation_evidence", schema["required"])
 
 
 class AnchorClientTests(unittest.TestCase):
