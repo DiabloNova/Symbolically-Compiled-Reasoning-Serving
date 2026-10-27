@@ -934,7 +934,7 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
             "model_id_semantics": "render_model/oracle_model/anchor_model are requested model IDs or router aliases; per-call model fields preserve the provider-reported resolved model.",
             "observed_model_ids": observed_model_ids,
             "model_identity_consistency": model_identity_consistency,
-            "provider_min_interval_seconds": render_client.min_interval_seconds,
+            "provider_min_interval_seconds": getattr(render_client, "min_interval_seconds", 0.0),
             "render_endpoint": render_client.base_url,
             "oracle_endpoint": oracle_client.base_url,
             "anchor_endpoint": anchor_provider.base_url,
