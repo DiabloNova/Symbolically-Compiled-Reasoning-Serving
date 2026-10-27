@@ -13,6 +13,8 @@ from experiments.scrs_runtime.anchor_client import (
 )
 from experiments.scrs_runtime.run_legalbench import (
     apply_seeded_sample,
+    exclude_test_rows,
+    load_exclusion_indices,
     selected_test_row_indices,
 )
 
@@ -83,6 +85,34 @@ class SeededSamplingTests(unittest.TestCase):
         original = copy.deepcopy(tasks)
         apply_seeded_sample(tasks, 0, 20261027)
         self.assertEqual(tasks, original)
+
+    def test_explicit_exclusions_remove_only_named_rows_and_are_manifestable(self):
+        tasks = self.fixture_tasks()
+        applied = exclude_test_rows(tasks, {"alpha": [3, 12], "beta": [7]})
+        self.assertEqual(applied, {"alpha": [3, 12], "beta": [7]})
+        self.assertEqual(len(tasks["alpha"]), 38)
+        self.assertEqual(len(tasks["beta"]), 39)
+        self.assertNotIn(3, [row["index"] for row in tasks["alpha"]])
+        self.assertNotIn(12, [row["index"] for row in tasks["alpha"]])
+        self.assertNotIn(7, [row["index"] for row in tasks["beta"]])
+        self.assertEqual(set(row["index"] for row in tasks["alpha"]), set(range(40)) - {3, 12})
+
+    def test_missing_requested_exclusion_fails_closed(self):
+        tasks = self.fixture_tasks()
+        with self.assertRaises(ValueError):
+            exclude_test_rows(tasks, {"alpha": [999]})
+
+    def test_exclusion_map_loader_rejects_boolean_and_duplicate_indices(self):
+        with tempfile.TemporaryDirectory() as temp:
+            p = Path(temp) / "exclusions.json"
+            p.write_text(json.dumps({"alpha": [True]}), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                load_exclusion_indices(p)
+            p.write_text(json.dumps({"alpha": [1, 1]}), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                load_exclusion_indices(p)
+            p.write_text(json.dumps({"alpha": [1, 2]}), encoding="utf-8")
+            self.assertEqual(load_exclusion_indices(p), {"alpha": [1, 2]})
 
 
 class ProviderExtraBodyTests(unittest.TestCase):
