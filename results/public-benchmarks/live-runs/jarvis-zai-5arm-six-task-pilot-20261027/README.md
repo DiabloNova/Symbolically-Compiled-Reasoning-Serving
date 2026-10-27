@@ -32,6 +32,7 @@ This heterogeneous pattern motivates a larger paired evaluation but does not pro
 Across the six completed rows: **48 provider transport attempts, 48 confirmed generations, 17,996 provider-reported input tokens, and 846 provider-reported output tokens**. Billed cost is NR. Request durations are not production latency evidence; wall-clock time includes deliberate request pacing.
 
 - `case-results.jsonl`: concatenated original case records for all six tasks.
+- `analysis.json`: output of `experiments/scrs_runtime/analyze_factorial.py` (5,000 seeded bootstrap draws; intervals are degenerate at n=1 and are flagged descriptive-only).
 - `run-manifest.json`: dataset hashes, sample indices, provider identity/configuration, and physical usage totals.
 - Each original run directory retains its own metrics, five prediction files, capsule/gate trace, and event log.
 
