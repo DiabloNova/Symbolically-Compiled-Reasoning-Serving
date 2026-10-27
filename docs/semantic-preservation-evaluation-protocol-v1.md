@@ -106,9 +106,9 @@ Invalid capsule output is a preservation failure for the capsule route and must 
 
 Use these columns for the blinded annotation file:
 
-blind_item_id,task_id,source_row_index,source_fields_json,capsule_json,annotator_id,ds_preserved,severity,error_tags,decision_relevant_propositions,omitted_or_distorted_propositions,source_evidence,capsule_evidence,could_change_task_decision,rationale
+blind_item_id,task_description,allowed_labels_json,source_fields_json,capsule_payload_json,capsule_available,annotator_id,ds_preserved,severity,error_tags,decision_relevant_propositions,omitted_or_distorted_propositions,source_evidence,capsule_evidence,could_change_task_decision,rationale
 
-The source row index and task are necessary audit metadata. The gold label, predictions, condition ranking, provider identity, and performance metrics must not be present in the annotator-facing worksheet. Maintain any reverse mapping separately.
+Do not include task ID, source row index, gold label, predictions, condition ranking, provider identity, performance metrics, or run ID in the annotator-facing worksheet. Store those fields in a separate restricted mapping with the blind ID, task ID, source row index, gold label, source hash, capsule hash/status, sample seed, run ID, model ID, and eventual predictions. Keep the mapping away from annotators until their initial annotations are locked.
 
 ## 8. Evidence boundary
 
