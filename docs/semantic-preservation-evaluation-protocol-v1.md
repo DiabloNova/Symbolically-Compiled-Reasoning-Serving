@@ -104,7 +104,7 @@ Invalid capsule output is a preservation failure for the capsule route and must 
 
 ## 7. Annotation worksheet schema
 
-Use these columns for the blinded annotation file:
+A blank CSV header template is available at [results/public-benchmarks/semantic-preservation/annotation-template.csv](../results/public-benchmarks/semantic-preservation/annotation-template.csv). Use these columns for the blinded annotation file:
 
 blind_item_id,task_description,allowed_labels_json,source_fields_json,capsule_payload_json,capsule_available,annotator_id,ds_preserved,severity,error_tags,decision_relevant_propositions,omitted_or_distorted_propositions,source_evidence,capsule_evidence,could_change_task_decision,rationale
 
