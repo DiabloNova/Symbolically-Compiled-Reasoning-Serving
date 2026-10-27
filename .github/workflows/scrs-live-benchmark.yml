@@ -225,8 +225,8 @@ jobs:
           report = json.loads((root / "mock-diagnostics.json").read_text())
           assert report["run_status"] == "MOCK_SIMULATION_COMPLETED", report
           assert report["cases_exercised"] == 12, report
-          assert report["prediction_files_written"] == 18, report
-          assert report["condition_predictions_written"] == 36, report
+          assert report["prediction_files_written"] == 30, report
+          assert report["condition_predictions_written"] == 60, report
           assert report["mock_api_requests"] > 0, report
           assert report["external_provider_calls"] == 0, report
           assert report["model_predictions_generated"] is False, report
