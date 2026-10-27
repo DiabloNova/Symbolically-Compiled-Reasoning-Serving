@@ -880,6 +880,15 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 write_json(out_dir / "failure.json", failure)
                 raise
 
+    observed_model_ids = sorted({
+        str(call["model"])
+        for case in all_cases
+        for condition_calls in case.get("call_usage_by_condition", {}).values()
+        for call in condition_calls
+        if isinstance(call, dict) and isinstance(call.get("model"), str) and call["model"].strip()
+    })
+    model_identity_consistency = len(observed_model_ids) == 1
+
     metrics: dict[str, Any] = {}
     for task_id, task_rows in tasks.items():
         selected_rows = task_rows if max_examples <= 0 else task_rows[:max_examples]
@@ -911,14 +920,6 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 "gold_sha256": sidecars[task_id]["normalized_jsonl_sha256"],
                 "predictions": preds,
             })
-    observed_model_ids = sorted({
-        str(call["model"])
-        for case in all_cases
-        for condition_calls in case.get("call_usage_by_condition", {}).values()
-        for call in condition_calls
-        if isinstance(call, dict) and isinstance(call.get("model"), str) and call["model"].strip()
-    })
-    model_identity_consistency = len(observed_model_ids) == 1
     summary = {
         "run_id": run_id,
         "run_status": "COMPLETED" if model_identity_consistency else "COMPLETED_MODEL_ROUTING_VARIATION",
