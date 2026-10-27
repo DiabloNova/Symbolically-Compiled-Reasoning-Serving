@@ -68,6 +68,7 @@ class OpenAICompatibleClient:
         max_retries: int = 2,
         allow_unauthenticated: bool = False,
         max_token_parameter: str | None = None,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         base_url = (base_url or "").strip().rstrip("/")
         model = (model or "").strip()
@@ -112,6 +113,19 @@ class OpenAICompatibleClient:
         self.max_token_parameter = selected_token_parameter
         self.is_openai_api = is_openai_api
         self.openai_reasoning_family = openai_reasoning_family
+        if extra_body is not None and not isinstance(extra_body, dict):
+            raise ProviderConfigurationError("extra_body must be a JSON object.")
+        reserved = {"model", "messages", "max_tokens", "max_completion_tokens", "stream", "temperature"}
+        overlap = sorted(reserved.intersection(extra_body or {}))
+        if overlap:
+            raise ProviderConfigurationError(
+                "Provider extra body cannot override core request field(s): " + ", ".join(overlap)
+            )
+        try:
+            json.dumps(extra_body or {}, ensure_ascii=False, sort_keys=True)
+        except (TypeError, ValueError) as exc:
+            raise ProviderConfigurationError("Provider extra body must contain JSON-compatible values.") from exc
+        self.extra_body = dict(extra_body or {})
 
     @classmethod
     def from_env(cls, role: str = "render") -> "OpenAICompatibleClient":
@@ -137,6 +151,17 @@ class OpenAICompatibleClient:
         timeout = float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60"))
         retries = int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2"))
         token_parameter = os.getenv("SCRS_MAX_TOKEN_PARAMETER") or None
+        raw_extra_body = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
+        try:
+            extra_body = json.loads(raw_extra_body) if raw_extra_body else {}
+        except json.JSONDecodeError as exc:
+            raise ProviderConfigurationError(
+                "SCRS_PROVIDER_EXTRA_BODY_JSON must be valid JSON."
+            ) from exc
+        if not isinstance(extra_body, dict):
+            raise ProviderConfigurationError(
+                "SCRS_PROVIDER_EXTRA_BODY_JSON must decode to a JSON object."
+            )
         return cls(
             base_url=base_url,
             model=model,
@@ -146,6 +171,7 @@ class OpenAICompatibleClient:
             max_retries=retries,
             allow_unauthenticated=allow_unauthenticated,
             max_token_parameter=token_parameter,
+            extra_body=extra_body,
         )
 
     def _event_id(self, request_id_hash: str, sequence: int, attempt: int, event_type: str) -> str:
@@ -188,6 +214,7 @@ class OpenAICompatibleClient:
         }
         if not self.openai_reasoning_family:
             payload_object["temperature"] = temperature
+        payload_object.update(self.extra_body)
         payload = json.dumps(
             payload_object,
             ensure_ascii=False,
