@@ -264,8 +264,8 @@ def main(argv: list[str] | None = None) -> int:
                 task_id: {
                     "n": item["n_paired_rows"],
                     "full_accuracy": item["arms"]["compiled_graph_gates"]["accuracy"],
-                    "interaction": item["conditional_graph_anchor_interaction"]["estimate"],
-                    "interaction_ci": item["conditional_graph_anchor_interaction"]["bootstrap_percentile_95_ci"],
+                    "interaction": item["conditional_graph_anchor_interaction"]["all_attempted_rows"]["estimate"],
+                    "interaction_ci": item["conditional_graph_anchor_interaction"]["all_attempted_rows"]["bootstrap_percentile_95_ci"],
                 }
                 for task_id, item in report["tasks"].items()
             },
