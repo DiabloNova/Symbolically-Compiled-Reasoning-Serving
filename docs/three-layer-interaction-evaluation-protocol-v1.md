@@ -10,7 +10,7 @@ The primary claim must be phrased as a hypothesis until evaluated on held-out, p
 
 ## 2. The current benchmark is not yet an interaction experiment
 
-The current reference runner emits three conditions: `baseline`, `capsule_only`, and `compiled_graph_gates`. The last condition includes the capsule extraction, graph/compatibility gates, Anchor hint, and compiled-path renderer. Those three arms can support a preliminary paired comparison, but they do **not** identify the separate conditional effect of graph gates, the effect of Anchor, or their interaction. A difference between the full path and the baseline must not be presented as a measured interaction or as causal proof of every layer's contribution.
+The initial reference runner emitted three conditions: `baseline`, `capsule_only`, and `compiled_graph_gates`. The research branch now implements five conditions: `baseline`, `capsule_only`, `capsule_graph_no_anchor`, `capsule_anchor_no_graph`, and `compiled_graph_gates`. This expands the design to estimate the graph–Anchor interaction conditional on capsule availability, provided all arms run on identical rows. It still does **not** make the present prototype equivalent to every operation in the manuscript's full multi-tier architecture; claims must be limited to the tested arm implementations and the actual model evidence.
 
 ## 3. Required paired conditions
 
