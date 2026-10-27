@@ -273,7 +273,8 @@ def build_capsule_only_messages(task_id: str, description: str, labels: list[str
 
 def build_compiled_render_messages(task_id: str, description: str, labels: list[str],
                                    capsule: dict[str, Any], graph: dict[str, Any],
-                                   trace: list[dict[str, Any]], anchor_hint: str) -> list[dict[str, str]]:
+                                   trace: list[dict[str, Any]], anchor_hint: str | None) -> list[dict[str, str]]:
+    """Render with graph/gate context; omit Anchor from the prompt when None."""
     prompt = {
         "task_id": task_id,
         "task_description": description,
@@ -281,14 +282,42 @@ def build_compiled_render_messages(task_id: str, description: str, labels: list[
         "capsule_payload": capsule["payload"],
         "compiled_graph": {"graph_id": graph["graph_id"], "nodes": graph["nodes"]},
         "verified_gate_trace": trace,
-        "anchor_hint": anchor_hint,
-        "instruction": (
+    }
+    if anchor_hint is None:
+        prompt["instruction"] = (
+            "Render exactly one allowed task label using the capsule, graph, and accepted gate trace. "
+            "No Anchor hint was generated for this condition. Do not invent missing facts. "
+            "Return a single exact label without explanation."
+        )
+    else:
+        prompt["anchor_hint"] = anchor_hint
+        prompt["instruction"] = (
             "Render exactly one allowed task label using the capsule, graph, accepted gate trace, and Anchor hint. "
             "Do not invent missing facts. Return a single exact label without explanation."
+        )
+    return [
+        {"role": "system", "content": "You are the SCRS renderer at the end of a compiled-graph path. Return one exact label."},
+        {"role": "user", "content": canonical_json(prompt)},
+    ]
+
+
+def build_capsule_anchor_render_messages(task_id: str, description: str, labels: list[str],
+                                          capsule: dict[str, Any], anchor_hint: str) -> list[dict[str, str]]:
+    """Render from a capsule and Anchor hint without graph or gate context."""
+    prompt = {
+        "task_id": task_id,
+        "task_description": description,
+        "allowed_labels": labels,
+        "capsule_payload": capsule["payload"],
+        "anchor_hint": anchor_hint,
+        "instruction": (
+            "Render exactly one allowed task label using only the capsule and Anchor hint. "
+            "No graph or gate trace was used for this condition. Do not invent missing facts. "
+            "Return a single exact label without explanation."
         ),
     }
     return [
-        {"role": "system", "content": "You are the SCRS renderer at the end of a compiled-graph path. Return one exact label."},
+        {"role": "system", "content": "You are the SCRS capsule-plus-Anchor renderer without graph gates. Return one exact label."},
         {"role": "user", "content": canonical_json(prompt)},
     ]
 
