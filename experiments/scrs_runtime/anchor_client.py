@@ -11,12 +11,31 @@ import json
 import os
 import socket
 import time
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+
+# Process-wide pacing shared by render/oracle/Anchor clients. It is opt-in and
+# measured between transport-attempt starts, not between successful responses.
+_RATE_LOCK = threading.Lock()
+_LAST_PROVIDER_ATTEMPT_START = 0.0
+
+
+def _pace_provider_attempt(min_interval_seconds: float) -> None:
+    global _LAST_PROVIDER_ATTEMPT_START
+    if min_interval_seconds <= 0:
+        return
+    with _RATE_LOCK:
+        now = time.monotonic()
+        delay = min_interval_seconds - (now - _LAST_PROVIDER_ATTEMPT_START)
+        if delay > 0:
+            time.sleep(delay)
+        _LAST_PROVIDER_ATTEMPT_START = time.monotonic()
 
 
 class ProviderConfigurationError(RuntimeError):
@@ -69,6 +88,7 @@ class OpenAICompatibleClient:
         allow_unauthenticated: bool = False,
         max_token_parameter: str | None = None,
         extra_body: dict[str, Any] | None = None,
+        min_interval_seconds: float = 0.0,
     ) -> None:
         base_url = (base_url or "").strip().rstrip("/")
         model = (model or "").strip()
@@ -78,6 +98,8 @@ class OpenAICompatibleClient:
             raise ProviderConfigurationError("timeout_seconds must be positive.")
         if max_retries < 0 or max_retries > 5:
             raise ProviderConfigurationError("max_retries must be between 0 and 5.")
+        if min_interval_seconds < 0 or min_interval_seconds > 60:
+            raise ProviderConfigurationError("min_interval_seconds must be between 0 and 60.")
         parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ProviderConfigurationError("Provider base URL must be an absolute HTTP(S) URL.")
@@ -110,6 +132,7 @@ class OpenAICompatibleClient:
         self.role = role
         self.timeout_seconds = float(timeout_seconds)
         self.max_retries = int(max_retries)
+        self.min_interval_seconds = float(min_interval_seconds)
         self.max_token_parameter = selected_token_parameter
         self.is_openai_api = is_openai_api
         self.openai_reasoning_family = openai_reasoning_family
@@ -150,6 +173,7 @@ class OpenAICompatibleClient:
         allow_unauthenticated = os.getenv("SCRS_ALLOW_UNAUTHENTICATED_ENDPOINT", "").lower() == "true"
         timeout = float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60"))
         retries = int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2"))
+        min_interval = float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0"))
         token_parameter = os.getenv("SCRS_MAX_TOKEN_PARAMETER") or None
         raw_extra_body = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
         try:
@@ -172,6 +196,7 @@ class OpenAICompatibleClient:
             allow_unauthenticated=allow_unauthenticated,
             max_token_parameter=token_parameter,
             extra_body=extra_body,
+            min_interval_seconds=min_interval,
         )
 
     def _event_id(self, request_id_hash: str, sequence: int, attempt: int, event_type: str) -> str:
@@ -227,6 +252,8 @@ class OpenAICompatibleClient:
         provider_request_id_hash = None
 
         for attempt_number in range(1, self.max_retries + 2):
+            _pace_provider_attempt(self.min_interval_seconds)
+            retry_delay_override: float | None = None
             started = time.monotonic()
             start_ms = round(started * 1000, 3)
             status = "unknown"
@@ -280,9 +307,29 @@ class OpenAICompatibleClient:
                 provider_evidence = "UNKNOWN"
                 unknown_reason = "TRANSPORT_ERROR"
                 last_error = f"HTTP {exc.code}"
-                if exc.code in self.RETRYABLE_HTTP_CODES and attempt_number <= self.max_retries:
+                if exc.code == 429:
+                    # Rate-limit responses are not retried aggressively. Retry only
+                    # when the provider supplies a bounded Retry-After instruction.
+                    raw_retry_after = getattr(exc, "headers", None)
+                    raw_retry_after = raw_retry_after.get("Retry-After") if raw_retry_after else None
+                    try:
+                        parsed_retry_after = float(raw_retry_after) if raw_retry_after is not None else None
+                    except (TypeError, ValueError):
+                        parsed_retry_after = None
+                    if (
+                        parsed_retry_after is not None
+                        and 1.0 <= parsed_retry_after <= 30.0
+                        and attempt_number <= self.max_retries
+                    ):
+                        retry_delay_override = parsed_retry_after
+                        retry_reason = "HTTP_429_RETRY_AFTER"
+                    else:
+                        retry_reason = None
+                elif exc.code in self.RETRYABLE_HTTP_CODES and attempt_number <= self.max_retries:
                     retry_reason = f"HTTP_{exc.code}"
                 else:
+                    retry_reason = None
+                if retry_reason is None:
                     attempts.append({
                         "attempt_number": attempt_number, "status": status, "http_status": http_status,
                         "duration_ms": round((time.monotonic() - started) * 1000, 3),
@@ -360,7 +407,10 @@ class OpenAICompatibleClient:
                 )
 
             if retry_reason:
-                time.sleep(min(0.25 * (2 ** (attempt_number - 1)), 2.0))
+                delay = retry_delay_override
+                if delay is None:
+                    delay = min(0.5 * (2 ** (attempt_number - 1)), 4.0)
+                time.sleep(delay)
                 continue
 
             raise ProviderRequestError(
