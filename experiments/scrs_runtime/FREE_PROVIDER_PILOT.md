@@ -31,6 +31,17 @@ Set these variables in the shell running the pilot:
 
 The no-key exception is explicitly enabled because this particular provider endpoint was observed to accept unauthenticated free-model requests. Do not set the exception for an endpoint that is not intentionally anonymous. Non-loopback requests still require HTTPS.
 
+## Observed anonymous-use limit during follow-up
+
+On 2026-10-27, two seeded task runs completed using this configuration. Subsequent model requests returned HTTP 429 with the gateway error code PROMOTION_MODEL_LIMIT_REACHED and a message requiring free signup to continue. Switching to other free-model IDs returned the same gate. No signup or account creation was performed. The wider six-task run therefore remains incomplete.
+
+The live gateway documentation says anonymous free-model access is IP-rate-limited (documented at 200 requests per hour per IP), and free model availability/limits can vary. The specific promotion gate observed in this run appears to be an additional current limitation:
+- Authentication: https://kilo.ai/docs/gateway/authentication
+- Models and providers: https://kilo.ai/docs/gateway/models-and-providers
+- Usage and billing: https://kilo.ai/docs/gateway/usage-and-billing
+
+Do not retry the same workload aggressively. Continue only after a legitimate provider quota reset or a user-authorized free account/key is available. A failed/partial run must not be promoted into scored results.
+
 Example command:
 
     python experiments/scrs_runtime/run_legalbench.py \
