@@ -905,14 +905,23 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 "run_id": run_id,
                 "task_id": task_id,
                 "condition": condition,
-                "model": render_client.model,
+                "requested_model_route": render_client.model,
+                "observed_model_ids": observed_model_ids,
                 "upstream_revision": sidecars[task_id]["upstream_revision"],
                 "gold_sha256": sidecars[task_id]["normalized_jsonl_sha256"],
                 "predictions": preds,
             })
+    observed_model_ids = sorted({
+        str(call["model"])
+        for case in all_cases
+        for condition_calls in case.get("call_usage_by_condition", {}).values()
+        for call in condition_calls
+        if isinstance(call, dict) and isinstance(call.get("model"), str) and call["model"].strip()
+    })
+    model_identity_consistency = len(observed_model_ids) == 1
     summary = {
         "run_id": run_id,
-        "run_status": "COMPLETED",
+        "run_status": "COMPLETED" if model_identity_consistency else "COMPLETED_MODEL_ROUTING_VARIATION",
         "timestamp_utc": utc_now(),
         "experiment_type": "live-provider-paired-legalbench-pilot",
         "conditions": list(CONDITIONS),
@@ -921,6 +930,9 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
             "render_model": render_client.model,
             "oracle_model": oracle_client.model,
             "anchor_model": anchor_provider.model,
+            "model_id_semantics": "render_model/oracle_model/anchor_model are requested model IDs or router aliases; per-call model fields preserve the provider-reported resolved model.",
+            "observed_model_ids": observed_model_ids,
+            "model_identity_consistency": model_identity_consistency,
             "render_endpoint": render_client.base_url,
             "oracle_endpoint": oracle_client.base_url,
             "anchor_endpoint": anchor_provider.base_url,
