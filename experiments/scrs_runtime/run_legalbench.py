@@ -102,6 +102,51 @@ def selected_test_row_indices(
     }
 
 
+def load_exclusion_indices(path: Path | None) -> dict[str, list[int]]:
+    """Load an explicit task -> test-row-index exclusion map, if supplied."""
+    if path is None:
+        return {}
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("Excluded test-row JSON must be an object mapping task IDs to index arrays.")
+    result: dict[str, list[int]] = {}
+    for task_id, indices in value.items():
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("Excluded test-row map contains a blank/non-string task ID.")
+        if not isinstance(indices, list) or any(
+            not isinstance(index, int) or isinstance(index, bool) or index < 0
+            for index in indices
+        ):
+            raise ValueError(f"Excluded indices for {task_id!r} must be non-negative integer arrays.")
+        if len(indices) != len(set(indices)):
+            raise ValueError(f"Excluded indices for {task_id!r} contain duplicates.")
+        result[task_id] = list(indices)
+    return result
+
+
+def exclude_test_rows(
+    tasks: dict[str, list[dict[str, Any]]],
+    exclusions: dict[str, list[int]],
+) -> dict[str, list[int]]:
+    """Remove explicitly exposed rows from the active pools and return applied exclusions."""
+    applied: dict[str, list[int]] = {}
+    for task_id, rows in list(tasks.items()):
+        requested = exclusions.get(task_id, [])
+        available = {row["index"] for row in rows}
+        missing = sorted(set(requested) - available)
+        if missing:
+            raise ValueError(
+                f"{task_id}: requested exclusions are not present in the pinned test rows: {missing}."
+            )
+        remove = set(requested)
+        remaining = [row for row in rows if row["index"] not in remove]
+        if rows and not remaining:
+            raise ValueError(f"{task_id}: exclusions remove every available test row.")
+        tasks[task_id] = remaining
+        applied[task_id] = sorted(remove)
+    return applied
+
+
 def provider_request_options_metadata() -> dict[str, Any]:
     raw = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
     try:
@@ -968,6 +1013,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="N rows per selected task; defaults to the first N unless --sample-seed is set.")
     parser.add_argument("--sample-seed", type=int, default=None,
                         help="Stable task-specific random sampling seed; records selected test row indices.")
+    parser.add_argument("--exclude-test-indices-json", type=Path, default=None,
+                        help="JSON object mapping task IDs to test row indices that must be excluded.")
     parser.add_argument("--full", action="store_true", help="Use every test row for each selected task.")
     parser.add_argument("--validate-only", action="store_true", help="Verify data/gates/prompts without provider calls.")
     parser.add_argument("--output-root", type=Path, default=ROOT / "results/public-benchmarks/live-runs")
@@ -987,6 +1034,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = json.loads(DATA_MANIFEST.read_text(encoding="utf-8"))
         task_ids = exact_task_ids(manifest, args.tasks)
         manifest, tasks, sidecars = load_verified_task_data(task_ids)
+        available_test_rows_original = {task_id: len(rows) for task_id, rows in tasks.items()}
+        exclusion_map = load_exclusion_indices(args.exclude_test_indices_json)
+        applied_exclusions = exclude_test_rows(tasks, exclusion_map)
         available_test_rows = {task_id: len(rows) for task_id, rows in tasks.items()}
         apply_seeded_sample(tasks, args.max_examples, args.sample_seed)
         selected_indices = selected_test_row_indices(tasks, args.max_examples)
@@ -997,7 +1047,11 @@ def main(argv: list[str] | None = None) -> int:
             "tasks": task_ids,
             "split": "test",
             "selected_examples_per_task": "all" if args.max_examples == 0 else args.max_examples,
+            "test_rows_available_original": available_test_rows_original,
+            "test_rows_excluded_from_pool": applied_exclusions,
+            "test_rows_available_after_exclusion": available_test_rows,
             "test_rows_available": available_test_rows,
+            "exclusion_map_path": str(args.exclude_test_indices_json) if args.exclude_test_indices_json else None,
             "sample_seed": args.sample_seed,
             "sample_selection_strategy": (
                 "all_rows" if args.max_examples == 0
