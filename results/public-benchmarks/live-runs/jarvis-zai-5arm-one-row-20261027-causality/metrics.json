@@ -1,0 +1,534 @@
+{
+  "conditions": [
+    "baseline",
+    "capsule_only",
+    "capsule_graph_no_anchor",
+    "capsule_anchor_no_graph",
+    "compiled_graph_gates"
+  ],
+  "evidence_boundary": "Live provider predictions for the selected LegalBench rows only. Pilot metrics do not establish general SCRS semantic preservation, production latency, or provider-billed cost. Capsule-extraction usage is shared physically and allocated to each compressed counterfactual for per-path comparison.",
+  "execution": {
+    "anchor_endpoint": "https://api.jarvisclaw.ai/v1",
+    "anchor_max_tokens": 5,
+    "anchor_model": "zai/glm-4-flash",
+    "capsule_max_tokens": 384,
+    "model_id_semantics": "render_model/oracle_model/anchor_model are requested model IDs or router aliases; per-call model fields preserve the provider-reported resolved model.",
+    "model_identity_consistency": true,
+    "observed_model_ids": [
+      "glm-4-flash"
+    ],
+    "oracle_endpoint": "https://api.jarvisclaw.ai/v1",
+    "oracle_model": "zai/glm-4-flash",
+    "prediction_max_tokens": 16,
+    "provider_billed_cost": "NR; API token usage is reported separately and prices/accounting are not configured.",
+    "provider_min_interval_seconds": 5.0,
+    "render_endpoint": "https://api.jarvisclaw.ai/v1",
+    "render_model": "zai/glm-4-flash",
+    "retried_requests_included": true,
+    "temperature": 0.0
+  },
+  "experiment_type": "live-provider-paired-legalbench-pilot",
+  "run_id": "jarvis-zai-5arm-one-row-20261027-causality",
+  "run_status": "COMPLETED",
+  "run_usage": {
+    "confirmed_provider_generations": 8,
+    "provider_reported_input_tokens": 4237,
+    "provider_reported_output_tokens": 308,
+    "provider_transport_attempts": 8
+  },
+  "tasks": {
+    "legal_reasoning_causality": {
+      "baseline": {
+        "accuracy": 1.0,
+        "accuracy_ci95_wilson": [
+          0.20654931437723745,
+          1.0
+        ],
+        "confusion_matrix": {
+          "No": {
+            "No": 1,
+            "Yes": 0,
+            "__INVALID__": 0
+          },
+          "Yes": {
+            "No": 0,
+            "Yes": 0,
+            "__INVALID__": 0
+          }
+        },
+        "correct": 1,
+        "invalid_outputs": 0,
+        "macro_f1": 0.5,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "n": 1,
+        "per_class": {
+          "No": {
+            "f1": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 1
+          },
+          "Yes": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0
+          }
+        },
+        "provider_usage_and_latency": {
+          "calls_with_provider_usage": 1,
+          "calls_without_provider_usage": 0,
+          "confirmed_generations_from_attempt_evidence": 1,
+          "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+          "mean_sequential_provider_latency_ms_per_request": 996.991,
+          "p50_sequential_provider_latency_ms_per_request": 996.991,
+          "p95_sequential_provider_latency_ms_per_request": 996.991,
+          "provider_calls_in_counterfactual_path": 1,
+          "provider_reported_input_tokens": 390,
+          "provider_reported_output_tokens": 3,
+          "transport_attempts": 1,
+          "usage_allocation": "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; the run-level provider total counts it once"
+        },
+        "strict_existing_scorer": {
+          "accuracy": 1.0,
+          "accuracy_ci95_wilson": [
+            0.20654931437723745,
+            1.0
+          ],
+          "confusion_matrix": {
+            "no": {
+              "no": 1,
+              "yes": 0
+            },
+            "yes": {
+              "no": 0,
+              "yes": 0
+            }
+          },
+          "correct": 1,
+          "label_support": {
+            "no": 1
+          },
+          "labels": [
+            "no",
+            "yes"
+          ],
+          "macro_f1": 0.5,
+          "macro_precision": 0.5,
+          "macro_recall": 0.5,
+          "n": 1,
+          "per_class": {
+            "no": {
+              "f1": 1.0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "support": 1
+            },
+            "yes": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 0
+            }
+          }
+        },
+        "task_id": "legal_reasoning_causality",
+        "valid_prediction_rate": 1.0
+      },
+      "capsule_anchor_no_graph": {
+        "accuracy": 0.0,
+        "accuracy_ci95_wilson": [
+          0.0,
+          0.7934506856227626
+        ],
+        "confusion_matrix": {
+          "No": {
+            "No": 0,
+            "Yes": 1,
+            "__INVALID__": 0
+          },
+          "Yes": {
+            "No": 0,
+            "Yes": 0,
+            "__INVALID__": 0
+          }
+        },
+        "correct": 0,
+        "invalid_outputs": 0,
+        "macro_f1": 0.0,
+        "macro_precision": 0.0,
+        "macro_recall": 0.0,
+        "n": 1,
+        "per_class": {
+          "No": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 1
+          },
+          "Yes": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0
+          }
+        },
+        "provider_usage_and_latency": {
+          "calls_with_provider_usage": 3,
+          "calls_without_provider_usage": 0,
+          "confirmed_generations_from_attempt_evidence": 3,
+          "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+          "mean_sequential_provider_latency_ms_per_request": 29911.857,
+          "p50_sequential_provider_latency_ms_per_request": 29911.857,
+          "p95_sequential_provider_latency_ms_per_request": 29911.857,
+          "provider_calls_in_counterfactual_path": 3,
+          "provider_reported_input_tokens": 1331,
+          "provider_reported_output_tokens": 291,
+          "transport_attempts": 3,
+          "usage_allocation": "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; the run-level provider total counts it once"
+        },
+        "strict_existing_scorer": {
+          "accuracy": 0.0,
+          "accuracy_ci95_wilson": [
+            0.0,
+            0.7934506856227626
+          ],
+          "confusion_matrix": {
+            "no": {
+              "no": 0,
+              "yes": 1
+            },
+            "yes": {
+              "no": 0,
+              "yes": 0
+            }
+          },
+          "correct": 0,
+          "label_support": {
+            "no": 1
+          },
+          "labels": [
+            "no",
+            "yes"
+          ],
+          "macro_f1": 0.0,
+          "macro_precision": 0.0,
+          "macro_recall": 0.0,
+          "n": 1,
+          "per_class": {
+            "no": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 1
+            },
+            "yes": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 0
+            }
+          }
+        },
+        "task_id": "legal_reasoning_causality",
+        "valid_prediction_rate": 1.0
+      },
+      "capsule_graph_no_anchor": {
+        "accuracy": 0.0,
+        "accuracy_ci95_wilson": [
+          0.0,
+          0.7934506856227626
+        ],
+        "confusion_matrix": {
+          "No": {
+            "No": 0,
+            "Yes": 1,
+            "__INVALID__": 0
+          },
+          "Yes": {
+            "No": 0,
+            "Yes": 0,
+            "__INVALID__": 0
+          }
+        },
+        "correct": 0,
+        "invalid_outputs": 0,
+        "macro_f1": 0.0,
+        "macro_precision": 0.0,
+        "macro_recall": 0.0,
+        "n": 1,
+        "per_class": {
+          "No": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 1
+          },
+          "Yes": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0
+          }
+        },
+        "provider_usage_and_latency": {
+          "calls_with_provider_usage": 2,
+          "calls_without_provider_usage": 0,
+          "confirmed_generations_from_attempt_evidence": 2,
+          "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+          "mean_sequential_provider_latency_ms_per_request": 23892.489,
+          "p50_sequential_provider_latency_ms_per_request": 23892.489,
+          "p95_sequential_provider_latency_ms_per_request": 23892.489,
+          "provider_calls_in_counterfactual_path": 2,
+          "provider_reported_input_tokens": 1309,
+          "provider_reported_output_tokens": 286,
+          "transport_attempts": 2,
+          "usage_allocation": "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; the run-level provider total counts it once"
+        },
+        "strict_existing_scorer": {
+          "accuracy": 0.0,
+          "accuracy_ci95_wilson": [
+            0.0,
+            0.7934506856227626
+          ],
+          "confusion_matrix": {
+            "no": {
+              "no": 0,
+              "yes": 1
+            },
+            "yes": {
+              "no": 0,
+              "yes": 0
+            }
+          },
+          "correct": 0,
+          "label_support": {
+            "no": 1
+          },
+          "labels": [
+            "no",
+            "yes"
+          ],
+          "macro_f1": 0.0,
+          "macro_precision": 0.0,
+          "macro_recall": 0.0,
+          "n": 1,
+          "per_class": {
+            "no": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 1
+            },
+            "yes": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 0
+            }
+          }
+        },
+        "task_id": "legal_reasoning_causality",
+        "valid_prediction_rate": 1.0
+      },
+      "capsule_only": {
+        "accuracy": 1.0,
+        "accuracy_ci95_wilson": [
+          0.20654931437723745,
+          1.0
+        ],
+        "confusion_matrix": {
+          "No": {
+            "No": 1,
+            "Yes": 0,
+            "__INVALID__": 0
+          },
+          "Yes": {
+            "No": 0,
+            "Yes": 0,
+            "__INVALID__": 0
+          }
+        },
+        "correct": 1,
+        "invalid_outputs": 0,
+        "macro_f1": 0.5,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "n": 1,
+        "per_class": {
+          "No": {
+            "f1": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 1
+          },
+          "Yes": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0
+          }
+        },
+        "provider_usage_and_latency": {
+          "calls_with_provider_usage": 2,
+          "calls_without_provider_usage": 0,
+          "confirmed_generations_from_attempt_evidence": 2,
+          "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+          "mean_sequential_provider_latency_ms_per_request": 19402.29,
+          "p50_sequential_provider_latency_ms_per_request": 19402.29,
+          "p95_sequential_provider_latency_ms_per_request": 19402.29,
+          "provider_calls_in_counterfactual_path": 2,
+          "provider_reported_input_tokens": 883,
+          "provider_reported_output_tokens": 286,
+          "transport_attempts": 2,
+          "usage_allocation": "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; the run-level provider total counts it once"
+        },
+        "strict_existing_scorer": {
+          "accuracy": 1.0,
+          "accuracy_ci95_wilson": [
+            0.20654931437723745,
+            1.0
+          ],
+          "confusion_matrix": {
+            "no": {
+              "no": 1,
+              "yes": 0
+            },
+            "yes": {
+              "no": 0,
+              "yes": 0
+            }
+          },
+          "correct": 1,
+          "label_support": {
+            "no": 1
+          },
+          "labels": [
+            "no",
+            "yes"
+          ],
+          "macro_f1": 0.5,
+          "macro_precision": 0.5,
+          "macro_recall": 0.5,
+          "n": 1,
+          "per_class": {
+            "no": {
+              "f1": 1.0,
+              "precision": 1.0,
+              "recall": 1.0,
+              "support": 1
+            },
+            "yes": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 0
+            }
+          }
+        },
+        "task_id": "legal_reasoning_causality",
+        "valid_prediction_rate": 1.0
+      },
+      "compiled_graph_gates": {
+        "accuracy": 0.0,
+        "accuracy_ci95_wilson": [
+          0.0,
+          0.7934506856227626
+        ],
+        "confusion_matrix": {
+          "No": {
+            "No": 0,
+            "Yes": 1,
+            "__INVALID__": 0
+          },
+          "Yes": {
+            "No": 0,
+            "Yes": 0,
+            "__INVALID__": 0
+          }
+        },
+        "correct": 0,
+        "invalid_outputs": 0,
+        "macro_f1": 0.0,
+        "macro_precision": 0.0,
+        "macro_recall": 0.0,
+        "n": 1,
+        "per_class": {
+          "No": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 1
+          },
+          "Yes": {
+            "f1": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0
+          }
+        },
+        "provider_usage_and_latency": {
+          "calls_with_provider_usage": 3,
+          "calls_without_provider_usage": 0,
+          "confirmed_generations_from_attempt_evidence": 3,
+          "latency_definition": "sum of measured provider-call durations allocated to this path; excludes local CPU/queue spans and is not production percentile evidence",
+          "mean_sequential_provider_latency_ms_per_request": 26860.298,
+          "p50_sequential_provider_latency_ms_per_request": 26860.298,
+          "p95_sequential_provider_latency_ms_per_request": 26860.298,
+          "provider_calls_in_counterfactual_path": 3,
+          "provider_reported_input_tokens": 2031,
+          "provider_reported_output_tokens": 291,
+          "transport_attempts": 3,
+          "usage_allocation": "capsule extraction is a physical shared call but is included in both compressed-path counterfactual budgets; the run-level provider total counts it once"
+        },
+        "strict_existing_scorer": {
+          "accuracy": 0.0,
+          "accuracy_ci95_wilson": [
+            0.0,
+            0.7934506856227626
+          ],
+          "confusion_matrix": {
+            "no": {
+              "no": 0,
+              "yes": 1
+            },
+            "yes": {
+              "no": 0,
+              "yes": 0
+            }
+          },
+          "correct": 0,
+          "label_support": {
+            "no": 1
+          },
+          "labels": [
+            "no",
+            "yes"
+          ],
+          "macro_f1": 0.0,
+          "macro_precision": 0.0,
+          "macro_recall": 0.0,
+          "n": 1,
+          "per_class": {
+            "no": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 1
+            },
+            "yes": {
+              "f1": 0.0,
+              "precision": 0.0,
+              "recall": 0.0,
+              "support": 0
+            }
+          }
+        },
+        "task_id": "legal_reasoning_causality",
+        "valid_prediction_rate": 1.0
+      }
+    }
+  },
+  "timestamp_utc": "2026-10-27T12:17:25.614969+00:00"
+}
