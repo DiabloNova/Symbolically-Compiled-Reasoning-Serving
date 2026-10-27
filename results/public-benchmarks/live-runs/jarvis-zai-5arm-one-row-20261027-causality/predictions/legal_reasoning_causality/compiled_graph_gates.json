@@ -1,0 +1,18 @@
+{
+  "condition": "compiled_graph_gates",
+  "gold_sha256": "a8cf61546310346462933c163d7a8067bcc9c24196f10f1af32c8e1f3cf3dc9d",
+  "observed_model_ids": [
+    "glm-4-flash"
+  ],
+  "predictions": [
+    {
+      "index": 48,
+      "prediction": "Yes",
+      "prediction_valid": true
+    }
+  ],
+  "requested_model_route": "zai/glm-4-flash",
+  "run_id": "jarvis-zai-5arm-one-row-20261027-causality",
+  "task_id": "legal_reasoning_causality",
+  "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
+}
