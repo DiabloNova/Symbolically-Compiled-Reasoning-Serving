@@ -21,7 +21,7 @@ def make_case(task: str, index: int, gold: str, labels: dict[str, str]) -> dict:
         "capsule_anchor_no_graph": {"label": labels["capsule_anchor_no_graph"], "valid": labels["capsule_anchor_no_graph"] != "__INVALID__"},
         "compiled_graph_gates": {"label": labels["compiled_graph_gates"], "valid": labels["compiled_graph_gates"] != "__INVALID__"},
     }
-    return {"task_id": task, "index": index, "gold_label": gold, "predictions": predictions}
+    return {"task_id": task, "index": index, "gold_label": gold, "capsule_status": "VALID", "predictions": predictions}
 
 
 class FactorialAnalysisTests(unittest.TestCase):
@@ -44,7 +44,7 @@ class FactorialAnalysisTests(unittest.TestCase):
         alpha = result["tasks"]["alpha"]
         self.assertEqual(result["task_count"], 2)
         self.assertEqual(alpha["n_paired_rows"], 2)
-        self.assertEqual(alpha["conditional_graph_anchor_interaction"]["estimate"], 0.0)
+        self.assertEqual(alpha["conditional_graph_anchor_interaction"]["all_attempted_rows"]["estimate"], 0.0)
         self.assertEqual(alpha["arms"]["compiled_graph_gates"]["accuracy"], 1.0)
 
     def test_positive_interaction_is_detected(self):
@@ -59,8 +59,8 @@ class FactorialAnalysisTests(unittest.TestCase):
             for i in range(20)
         ]
         report = analyze(cases, bootstrap_replicates=500, seed=1)["tasks"]["task"]
-        self.assertEqual(report["conditional_graph_anchor_interaction"]["estimate"], 1.0)
-        self.assertEqual(report["conditional_graph_anchor_interaction"]["bootstrap_percentile_95_ci"], [1.0, 1.0])
+        self.assertEqual(report["conditional_graph_anchor_interaction"]["all_attempted_rows"]["estimate"], 1.0)
+        self.assertEqual(report["conditional_graph_anchor_interaction"]["all_attempted_rows"]["bootstrap_percentile_95_ci"], [1.0, 1.0])
 
     def test_invalid_output_counts_wrong_and_invalid(self):
         cases = [make_case("task", 0, "A", {
