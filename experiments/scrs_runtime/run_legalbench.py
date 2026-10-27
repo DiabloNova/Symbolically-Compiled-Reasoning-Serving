@@ -1007,6 +1007,21 @@ def main(argv: list[str] | None = None) -> int:
             "selected_test_row_indices": selected_indices,
             "provider_request_options": provider_options,
             "provider_min_interval_seconds": float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0")),
+            "provider_configuration": {
+                "shared_base_url": os.getenv("SCRS_BASE_URL", ""),
+                "shared_model_requested": os.getenv("SCRS_MODEL", ""),
+                "render_base_url_override": os.getenv("SCRS_RENDER_BASE_URL", ""),
+                "render_model_override": os.getenv("SCRS_RENDER_MODEL", ""),
+                "oracle_base_url_override": os.getenv("SCRS_ORACLE_BASE_URL", ""),
+                "oracle_model_override": os.getenv("SCRS_ORACLE_MODEL", ""),
+                "anchor_base_url_override": os.getenv("SCRS_ANCHOR_BASE_URL", ""),
+                "anchor_model_override": os.getenv("SCRS_ANCHOR_MODEL", ""),
+                "timeout_seconds": float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60")),
+                "max_retries": int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2")),
+                "min_interval_seconds": float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0")),
+                "allow_unauthenticated_endpoint": os.getenv("SCRS_ALLOW_UNAUTHENTICATED_ENDPOINT", "").lower() == "true",
+                "api_key_value_recorded": False
+            },
             "condition_design": {
                 "baseline": "original context; no capsule, graph, or Anchor",
                 "capsule_only": "capsule; graph and Anchor disabled",
