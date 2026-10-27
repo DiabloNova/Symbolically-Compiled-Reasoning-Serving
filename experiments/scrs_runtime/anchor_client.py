@@ -341,9 +341,12 @@ class OpenAICompatibleClient:
                 self._append_provider_response_event(events, request_id_hash, causal_interrupt_seq,
                                                      attempt_number, start_ms, started,
                                                      provider_request_id_hash, usage)
+                observed_model = decoded.get("model")
+                if not isinstance(observed_model, str) or not observed_model.strip():
+                    observed_model = self.model
                 return ProviderResult(
                     content=content,
-                    model=self.model,
+                    model=observed_model.strip(),
                     duration_ms=round((time.monotonic() - start_total) * 1000, 3),
                     attempts=attempts,
                     events=events,
@@ -494,14 +497,24 @@ class AnchorClient:
             "capsule": capsule,
             "verified_graph_trace": graph_trace,
             "instruction": (
-                "Return a compact anchor hint of at most five tokens. Do not return a full answer, "
-                "do not invent facts, and do not include chain-of-thought. If the evidence is insufficient, "
-                "return only the word UNKNOWN."
+                "Return exactly one short evidence phrase of one to five output tokens, "
+                "copying the most decision-relevant words from decision_relevant_facts. "
+                "Do not output a classification label, explanation, or punctuation. "
+                "If no useful fact exists, return UNKNOWN."
             ),
         }
         return self.client.chat(
             messages=[
-                {"role": "system", "content": "You are the bounded Anchor component in a research prototype."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an Anchor extractor. Read only the supplied capsule. "
+                        "Return exactly one short evidence phrase of 1–5 output tokens, "
+                        "copying the most decision-relevant words from decision_relevant_facts. "
+                        "Do not output a classification label, explanation, or punctuation. "
+                        "If no useful fact exists, return UNKNOWN."
+                    ),
+                },
                 {"role": "user", "content": json.dumps(prompt, ensure_ascii=False, sort_keys=True)},
             ],
             request_id_hash=request_id_hash,
