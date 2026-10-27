@@ -136,29 +136,31 @@ def analyze_task(cases: list[dict[str, Any]], *, bootstrap_replicates: int, seed
 
     # Per-row difference-in-differences on correctness:
     # (G=1,A=1) - (G=1,A=0) - (G=0,A=1) + (G=0,A=0).
-    interaction_values = [
-        y11 - y10 - y01 + y00
-        for y11, y10, y01, y00 in zip(
-            correctness["compiled_graph_gates"],
-            correctness["capsule_graph_no_anchor"],
-            correctness["capsule_anchor_no_graph"],
-            correctness["capsule_only"],
-        )
-    ]
-    estimate = sum(interaction_values) / n
-    rng = random.Random(seed)
-    bootstrap_means: list[float] = []
-    for _ in range(bootstrap_replicates):
-        bootstrap_means.append(
-            sum(interaction_values[rng.randrange(n)] for _ in range(n)) / n
-        )
-    return {
-        "task_id": next(iter(task_ids)),
-        "n_paired_rows": n,
-        "arms": accuracies,
-        "full_path_paired_comparisons": pairwise,
-        "conditional_graph_anchor_interaction": {
-            "estimand": "mean[(CGA correct) - (CG correct) - (CA correct) + (C correct)]",
+    def interaction_summary(
+        source_cases: list[dict[str, Any]],
+        values: list[int],
+        label: str,
+    ) -> dict[str, Any]:
+        subset_n = len(values)
+        if subset_n == 0:
+            return {
+                "subset": label,
+                "n_paired_rows": 0,
+                "estimate": None,
+                "bootstrap_percentile_95_ci": None,
+                "bootstrap_replicates": bootstrap_replicates,
+                "bootstrap_seed": seed,
+            }
+        estimate = sum(values) / subset_n
+        rng = random.Random(seed)
+        bootstrap_means: list[float] = []
+        for _ in range(bootstrap_replicates):
+            bootstrap_means.append(
+                sum(values[rng.randrange(subset_n)] for _ in range(subset_n)) / subset_n
+            )
+        return {
+            "subset": label,
+            "n_paired_rows": subset_n,
             "estimate": estimate,
             "bootstrap_percentile_95_ci": [
                 _percentile(bootstrap_means, 0.025),
@@ -168,8 +170,43 @@ def analyze_task(cases: list[dict[str, Any]], *, bootstrap_replicates: int, seed
             "bootstrap_seed": seed,
             "interpretation": (
                 "positive estimates indicate positive additive interaction in correctness "
-                "conditional on the capsule path and these paired rows; this is not a "
-                "distribution-free or universal synergy claim"
+                "for this subset and its paired rows; this is not a distribution-free or universal synergy claim"
+            ),
+        }
+
+    interaction_values = [
+        y11 - y10 - y01 + y00
+        for y11, y10, y01, y00 in zip(
+            correctness["compiled_graph_gates"],
+            correctness["capsule_graph_no_anchor"],
+            correctness["capsule_anchor_no_graph"],
+            correctness["capsule_only"],
+        )
+    ]
+    all_interaction = interaction_summary(cases, interaction_values, "all attempted rows (fallbacks retained)")
+    valid_cases = [case for case in cases if case.get("capsule_status") == "VALID"]
+    valid_interaction_values = [
+        _is_correct(case, "compiled_graph_gates")
+        - _is_correct(case, "capsule_graph_no_anchor")
+        - _is_correct(case, "capsule_anchor_no_graph")
+        + _is_correct(case, "capsule_only")
+        for case in valid_cases
+    ]
+    valid_interaction = interaction_summary(
+        valid_cases, valid_interaction_values, "rows with a schema-valid capsule (post-treatment subset)"
+    )
+    return {
+        "task_id": next(iter(task_ids)),
+        "n_paired_rows": n,
+        "arms": accuracies,
+        "full_path_paired_comparisons": pairwise,
+        "conditional_graph_anchor_interaction": {
+            "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+            "all_attempted_rows": all_interaction,
+            "valid_capsule_subset_secondary": valid_interaction,
+            "valid_subset_caveat": (
+                "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; "
+                "the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
             ),
         },
         "analysis_boundary": (
