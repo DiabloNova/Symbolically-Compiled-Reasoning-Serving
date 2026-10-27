@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import sys
 import tarfile
 import time
@@ -66,6 +67,59 @@ def utc_now() -> str:
 
 def digest_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def apply_seeded_sample(
+    tasks: dict[str, list[dict[str, Any]]],
+    max_examples: int,
+    sample_seed: int | None,
+) -> None:
+    """Put a stable, task-specific random sample first while retaining all source rows."""
+    if sample_seed is None or max_examples <= 0:
+        return
+    for task_id, rows in tasks.items():
+        sample_size = min(max_examples, len(rows))
+        seed_material = f"scrs-sample-v1:{sample_seed}:{task_id}".encode("utf-8")
+        stable_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:8], "big")
+        sampled = random.Random(stable_seed).sample(rows, sample_size)
+        sampled_indices = {row["index"] for row in sampled}
+        tasks[task_id] = (
+            [row for row in rows if row["index"] in sampled_indices]
+            + [row for row in rows if row["index"] not in sampled_indices]
+        )
+
+
+def selected_test_row_indices(
+    tasks: dict[str, list[dict[str, Any]]], max_examples: int
+) -> dict[str, list[int]]:
+    return {
+        task_id: [
+            row["index"]
+            for row in (rows if max_examples <= 0 else rows[:max_examples])
+        ]
+        for task_id, rows in tasks.items()
+    }
+
+
+def provider_request_options_metadata() -> dict[str, Any]:
+    raw = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
+    try:
+        extra_body = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        raise ValueError("SCRS_PROVIDER_EXTRA_BODY_JSON must be valid JSON.") from exc
+    if not isinstance(extra_body, dict):
+        raise ValueError("SCRS_PROVIDER_EXTRA_BODY_JSON must decode to a JSON object.")
+    reserved = {"model", "messages", "max_tokens", "max_completion_tokens", "stream", "temperature"}
+    overlap = sorted(reserved.intersection(extra_body))
+    if overlap:
+        raise ValueError(
+            "SCRS_PROVIDER_EXTRA_BODY_JSON cannot override core request field(s): "
+            + ", ".join(overlap)
+        )
+    return {
+        "extra_body_keys": sorted(extra_body),
+        "extra_body_sha256": digest_text(canonical_json(extra_body)),
+    }
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -822,7 +876,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tasks", default="all", help="all or comma-separated allowlisted task IDs")
     parser.add_argument("--max-examples", type=int, default=2,
-                        help="First N rows per selected task; use 0 or --full for all test rows.")
+                        help="N rows per selected task; defaults to the first N unless --sample-seed is set.")
+    parser.add_argument("--sample-seed", type=int, default=None,
+                        help="Stable task-specific random sampling seed; records selected test row indices.")
     parser.add_argument("--full", action="store_true", help="Use every test row for each selected task.")
     parser.add_argument("--validate-only", action="store_true", help="Verify data/gates/prompts without provider calls.")
     parser.add_argument("--output-root", type=Path, default=ROOT / "results/public-benchmarks/live-runs")
@@ -842,12 +898,25 @@ def main(argv: list[str] | None = None) -> int:
         manifest = json.loads(DATA_MANIFEST.read_text(encoding="utf-8"))
         task_ids = exact_task_ids(manifest, args.tasks)
         manifest, tasks, sidecars = load_verified_task_data(task_ids)
+        available_test_rows = {task_id: len(rows) for task_id, rows in tasks.items()}
+        apply_seeded_sample(tasks, args.max_examples, args.sample_seed)
+        selected_indices = selected_test_row_indices(tasks, args.max_examples)
+        provider_options = provider_request_options_metadata()
         run_manifest = {
             "run_id": run_id,
             "created_at_utc": utc_now(),
             "tasks": task_ids,
             "split": "test",
             "selected_examples_per_task": "all" if args.max_examples == 0 else args.max_examples,
+            "test_rows_available": available_test_rows,
+            "sample_seed": args.sample_seed,
+            "sample_selection_strategy": (
+                "all_rows" if args.max_examples == 0
+                else "sha256_seeded_random_sample_v1" if args.sample_seed is not None
+                else "first_n_rows"
+            ),
+            "selected_test_row_indices": selected_indices,
+            "provider_request_options": provider_options,
             "archive_sha256": manifest["_archive_verification"]["archive_sha256"],
             "upstream_revision": manifest["_archive_verification"]["upstream_revision"],
             "provider_calls_enabled": not args.validate_only,
