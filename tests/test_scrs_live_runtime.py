@@ -5,7 +5,7 @@ import socket
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from experiments.scrs_runtime.anchor_client import (
     AnchorClient,
@@ -232,6 +232,30 @@ class AnchorClientTests(unittest.TestCase):
         self.assertEqual(result.attempts[1]["provider_generation_evidence"], "CONFIRMED")
         sleep_mock.assert_called_once()
 
+
+    @patch("experiments.scrs_runtime.anchor_client.time.sleep")
+    @patch("experiments.scrs_runtime.anchor_client.urlopen")
+    def test_http_429_without_retry_after_fails_closed_without_immediate_retry(self, urlopen_mock, sleep_mock):
+        urlopen_mock.side_effect = HTTPError(
+            "https://provider.invalid/v1/chat/completions",
+            429,
+            "Too Many Requests",
+            {"Content-Type": "application/json"},
+            None,
+        )
+        client = self.make_client(retries=1)
+        with self.assertRaises(ProviderRequestError) as raised:
+            client.chat(
+                messages=[{"role": "user", "content": "test"}],
+                request_id_hash="f" * 32,
+                causal_interrupt_seq=9,
+                max_tokens=5,
+            )
+        self.assertEqual(len(raised.exception.attempts), 1)
+        self.assertEqual(raised.exception.attempts[0]["http_status"], 429)
+        self.assertEqual(raised.exception.events[0]["retry_reason"], None)
+        urlopen_mock.assert_called_once()
+        sleep_mock.assert_not_called()
 
     @patch("experiments.scrs_runtime.anchor_client.time.sleep")
     @patch("experiments.scrs_runtime.anchor_client.urlopen")
