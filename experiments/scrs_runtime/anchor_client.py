@@ -338,15 +338,19 @@ class OpenAICompatibleClient:
             if body is not None:
                 provider_request_id_hash = _sha(returned_request_id)[:20] if returned_request_id else None
                 content = body["choices"][0]["message"]["content"]
-                self._append_provider_response_event(events, request_id_hash, causal_interrupt_seq,
-                                                     attempt_number, start_ms, started,
-                                                     provider_request_id_hash, usage)
                 observed_model = decoded.get("model")
                 if not isinstance(observed_model, str) or not observed_model.strip():
                     observed_model = self.model
+                observed_model = observed_model.strip()
+                self._append_provider_response_event(events, request_id_hash, causal_interrupt_seq,
+                                                     attempt_number, start_ms, started,
+                                                     provider_request_id_hash, usage)
+                # Transport attempts record the requested route; a confirmed provider
+                # response records the model ID returned by the endpoint.
+                events[-1]["model"] = observed_model
                 return ProviderResult(
                     content=content,
-                    model=observed_model.strip(),
+                    model=observed_model,
                     duration_ms=round((time.monotonic() - start_total) * 1000, 3),
                     attempts=attempts,
                     events=events,
