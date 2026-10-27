@@ -24,6 +24,7 @@ class FakeResponse:
     def __init__(self):
         self.payload = json.dumps({
             "id": "fake-completion",
+            "model": "resolved-provider-model",
             "choices": [{"message": {"role": "assistant", "content": "UCC"}}],
             "usage": {"prompt_tokens": 10, "completion_tokens": 1},
         }).encode()
@@ -105,6 +106,8 @@ class ProviderExtraBodyTests(unittest.TestCase):
         sent = json.loads(urlopen_mock.call_args.args[0].data.decode("utf-8"))
         self.assertEqual(sent["reasoning"], {"effort": "none"})
         self.assertEqual(result.content, "UCC")
+        self.assertEqual(result.model, "resolved-provider-model")
+        self.assertEqual(result.events[-1]["model"], "resolved-provider-model")
 
     def test_provider_options_cannot_override_core_request_fields(self):
         with self.assertRaises(ProviderConfigurationError):
