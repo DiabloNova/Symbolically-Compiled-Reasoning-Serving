@@ -39,6 +39,7 @@ from experiments.scrs_runtime.scrs_runtime import (  # noqa: E402
     CapsuleValidationError,
     build_capsule_messages,
     build_capsule_only_messages,
+    build_capsule_anchor_render_messages,
     build_compiled_render_messages,
     build_full_messages,
     build_task_record,
@@ -58,7 +59,7 @@ DATA_MANIFEST = ROOT / "data" / "manifests" / "legalbench.json"
 DATA_ARCHIVE = ROOT / "data" / "public" / "legalbench" / "extra-licensed-snapshots-v1.tar.gz"
 EXPECTED_ARCHIVE_SHA256 = "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a"
 EXPECTED_UPSTREAM_REVISION = "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
-CONDITIONS = ("baseline", "capsule_only", "compiled_graph_gates")
+CONDITIONS = ("baseline", "capsule_only", "capsule_graph_no_anchor", "capsule_anchor_no_graph", "compiled_graph_gates")
 
 
 def utc_now() -> str:
@@ -242,7 +243,8 @@ def annotate_events(events: list[dict[str, Any]], run_id: str, task_id: str,
 
 
 def logical_interrupt_event(request_id_hash: str, sequence: int, run_id: str,
-                            task_id: str, index: int, start_ms: float, end_ms: float) -> dict[str, Any]:
+                            task_id: str, index: int, start_ms: float, end_ms: float,
+                            condition: str = "compiled_graph_gates") -> dict[str, Any]:
     event_type = "anchor_interrupt"
     event_id = digest_text(f"{request_id_hash}:{sequence}:0:{event_type}")[:32]
     return {
@@ -277,7 +279,7 @@ def logical_interrupt_event(request_id_hash: str, sequence: int, run_id: str,
         "benchmark_run_id": run_id,
         "task_id": task_id,
         "row_index": index,
-        "condition": "compiled_graph_gates",
+        "condition": condition,
         "call_kind": "logical_interrupt",
     }
 
@@ -461,6 +463,12 @@ def validate_mode(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, di
                 "input_sha256": record["source_input_sha256"],
                 "full_prompt_sha256": digest_text(canonical_json(msgs)),
                 "capsule_prompt_sha256": digest_text(canonical_json(capsule_msgs)),
+                "graph_no_anchor_prompt_sha256": digest_text(canonical_json(build_compiled_render_messages(
+                    task_id, record["description"], record["labels"], capsule, graph, trace, None
+                ))),
+                "capsule_anchor_render_prompt_sha256": digest_text(canonical_json(build_capsule_anchor_render_messages(
+                    task_id, record["description"], record["labels"], capsule, "UNKNOWN"
+                ))),
                 "gate_count": len(trace) - 1,
                 "gate_terminal": trace[-1]["decision"],
             })
@@ -574,6 +582,87 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 append_jsonl(event_path, annotate_events(result.events, run_id, task_id, row["index"], condition, call_kind))
                 return result
 
+            def invoke_anchor(condition: str, graph_trace: list[dict[str, Any]], sequence: int):
+                nonlocal total_provider_calls, total_confirmed_generations
+                nonlocal total_reported_input_tokens, total_reported_output_tokens
+                if capsule is None:
+                    raise ValueError("Anchor ablation cannot run without a valid capsule.")
+                logical_start = time.monotonic() * 1000
+                anchor_prompt = {
+                    "task": description,
+                    "allowed_labels": labels,
+                    "capsule": capsule["payload"],
+                    "verified_graph_trace": graph_trace,
+                    "instruction": (
+                        "Return a compact anchor hint of at most five tokens. Do not return a full answer, "
+                        "do not invent facts, and do not include chain-of-thought. If the evidence is insufficient, "
+                        "return only the word UNKNOWN."
+                    ),
+                }
+                prompt_hash = digest_text(canonical_json(anchor_prompt))
+                try:
+                    result = anchor_client.generate_anchors(
+                        task_description=description,
+                        allowed_labels=labels,
+                        capsule=capsule["payload"],
+                        graph_trace=graph_trace,
+                        request_id_hash=request_hash,
+                        causal_interrupt_seq=sequence,
+                    )
+                except ProviderRequestError as exc:
+                    logical_end = time.monotonic() * 1000
+                    logical = logical_interrupt_event(
+                        request_hash, sequence, run_id, task_id, row["index"],
+                        logical_start, logical_end, condition
+                    )
+                    failed_events = annotate_events(
+                        list(getattr(exc, "events", [])), run_id, task_id,
+                        row["index"], condition, "anchor_generation"
+                    )
+                    append_jsonl(event_path, [logical, *failed_events])
+                    failed_attempts = list(getattr(exc, "attempts", []))
+                    total_provider_calls += len(failed_attempts)
+                    total_confirmed_generations += sum(
+                        1 for e in failed_events if e.get("event_type") == "anchor_provider_response"
+                    )
+                    calls_by_condition[condition].append({
+                        "call_kind": "anchor_generation",
+                        "condition": condition,
+                        "causal_sequence": sequence,
+                        "model": anchor_provider.model,
+                        "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
+                        "attempt_count": len(failed_attempts),
+                        "attempts": failed_attempts,
+                        "usage": None,
+                        "usage_evidence": "UNAVAILABLE",
+                        "provider_request_id_hash": None,
+                        "prompt_sha256": prompt_hash,
+                        "request_id_hash": request_hash,
+                        "status": "FAILED_PROVIDER_REQUEST",
+                    })
+                    raise
+                logical_end = time.monotonic() * 1000
+                logical = logical_interrupt_event(
+                    request_hash, sequence, run_id, task_id, row["index"],
+                    logical_start, logical_end, condition
+                )
+                append_jsonl(event_path, [logical])
+                append_jsonl(event_path, annotate_events(
+                    result.events, run_id, task_id, row["index"], condition, "anchor_generation"
+                ))
+                total_provider_calls += len(result.attempts)
+                total_confirmed_generations += sum(
+                    1 for e in result.events if e.get("event_type") == "anchor_provider_response"
+                )
+                if result.usage:
+                    total_reported_input_tokens += result.usage["input_tokens"]
+                    total_reported_output_tokens += result.usage["output_tokens"]
+                call = call_record(result, "anchor_generation", condition, sequence)
+                call["prompt_sha256"] = prompt_hash
+                call["request_id_hash"] = request_hash
+                calls_by_condition[condition].append(call)
+                return result
+
             try:
                 # Condition A: full-context baseline.
                 seq += 1
@@ -586,7 +675,7 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 record_result(outputs, "baseline", baseline_label, request_hash, row["index"],
                               calls_by_condition["baseline"], "BASELINE")
 
-                # One capsule is compiled for the two compressed conditions. Its
+                # One capsule is compiled for the capsule-dependent conditions. Its
                 # preprocessing usage is allocated to both condition-level costs,
                 # while the run-level usage counts the provider call only once.
                 seq += 1
@@ -595,13 +684,15 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     build_capsule_messages(task_id, description, labels, task_record["input_fields"]),
                     "capsule_extraction", "capsule_only", capsule_tokens, seq
                 )
-                # The physical extraction call is shared across the two compressed paths.
-                # Its usage is allocated to both counterfactual path budgets, while the run total
-                # counts the actual provider request exactly once.
-                shared_capsule_call = dict(calls_by_condition["capsule_only"][-1])
-                shared_capsule_call["condition"] = "compiled_graph_gates"
-                shared_capsule_call["cost_allocation"] = "shared_preprocessing_counterfactual"
-                calls_by_condition["compiled_graph_gates"].append(shared_capsule_call)
+                # One physical extraction is shared by every capsule-dependent arm.
+                # Attribute it to each counterfactual path budget, but count it once in run totals.
+                for compressed_condition in (
+                    "capsule_graph_no_anchor", "capsule_anchor_no_graph", "compiled_graph_gates"
+                ):
+                    shared_capsule_call = dict(calls_by_condition["capsule_only"][-1])
+                    shared_capsule_call["condition"] = compressed_condition
+                    shared_capsule_call["cost_allocation"] = "shared_preprocessing_counterfactual"
+                    calls_by_condition[compressed_condition].append(shared_capsule_call)
                 try:
                     payload = parse_capsule_payload(capsule_result.content)
                     capsule = create_capsule(task_id, task_record["task_contract_version"], revision,
@@ -653,81 +744,65 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     "capsule_status": capsule_status, "capsule": capsule,
                     "compiled_graph": graph, "gate_trace": gate_trace,
                 })
+                # Arm CG: capsule plus graph/gates, but with no Anchor request or hint.
                 if accepted and capsule is not None and graph is not None:
-                    # One logical interrupt is accepted by the compiled renderer;
-                    # transport retries and provider generations are separately logged.
-                    logical_start = time.monotonic() * 1000
                     seq += 1
-                    try:
-                        anchor_result = anchor_client.generate_anchors(
-                            task_description=description,
-                            allowed_labels=labels,
-                            capsule=capsule["payload"],
-                            graph_trace=gate_trace,
-                            request_id_hash=request_hash,
-                            causal_interrupt_seq=seq,
-                        )
-                    except ProviderRequestError as exc:
-                        logical_end = time.monotonic() * 1000
-                        logical = logical_interrupt_event(
-                            request_hash, seq, run_id, task_id, row["index"], logical_start, logical_end
-                        )
-                        failed_events = annotate_events(
-                            list(getattr(exc, "events", [])), run_id, task_id,
-                            row["index"], "compiled_graph_gates", "anchor_generation"
-                        )
-                        append_jsonl(event_path, [logical, *failed_events])
-                        failed_attempts = list(getattr(exc, "attempts", []))
-                        total_provider_calls += len(failed_attempts)
-                        total_confirmed_generations += sum(
-                            1 for e in failed_events if e.get("event_type") == "anchor_provider_response"
-                        )
-                        calls_by_condition["compiled_graph_gates"].append({
-                            "call_kind": "anchor_generation",
-                            "condition": "compiled_graph_gates",
-                            "causal_sequence": seq,
-                            "model": anchor_provider.model,
-                            "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
-                            "attempt_count": len(failed_attempts),
-                            "attempts": failed_attempts,
-                            "usage": None,
-                            "usage_evidence": "UNAVAILABLE",
-                            "provider_request_id_hash": None,
-                            "prompt_sha256": digest_text(canonical_json({
-                                "task": description, "allowed_labels": labels,
-                                "capsule": capsule["payload"], "verified_graph_trace": gate_trace,
-                            })),
-                            "request_id_hash": request_hash,
-                            "status": "FAILED_PROVIDER_REQUEST",
-                        })
-                        raise
-                    logical_end = time.monotonic() * 1000
-                    logical = logical_interrupt_event(request_hash, seq, run_id, task_id, row["index"],
-                                                      logical_start, logical_end)
-                    append_jsonl(event_path, [logical])
-                    append_jsonl(event_path, annotate_events(anchor_result.events, run_id, task_id,
-                                                             row["index"], "compiled_graph_gates", "anchor_generation"))
-                    total_provider_calls += len(anchor_result.attempts)
-                    total_confirmed_generations += sum(
-                        1 for e in anchor_result.events if e.get("event_type") == "anchor_provider_response"
-                    )
-                    if anchor_result.usage:
-                        total_reported_input_tokens += anchor_result.usage["input_tokens"]
-                        total_reported_output_tokens += anchor_result.usage["output_tokens"]
-                    calls_by_condition["compiled_graph_gates"].append(
-                        call_record(anchor_result, "anchor_generation", "compiled_graph_gates", seq)
-                    )
-                    calls_by_condition["compiled_graph_gates"][-1]["prompt_sha256"] = digest_text(canonical_json({
-                        "task": description,
-                        "allowed_labels": labels,
-                        "capsule": capsule["payload"],
-                        "verified_graph_trace": gate_trace,
-                        "instruction": (
-                            "Return a compact anchor hint of at most five tokens; do not return a full answer, "
-                            "do not invent facts, and do not include chain-of-thought. If evidence is insufficient, return UNKNOWN."
+                    cg_result = invoke(
+                        render_client,
+                        build_compiled_render_messages(
+                            task_id, description, labels, capsule, graph, gate_trace, None
                         ),
-                    }))
-                    calls_by_condition["compiled_graph_gates"][-1]["request_id_hash"] = request_hash
+                        "graph_only_renderer", "capsule_graph_no_anchor", prediction_tokens, seq
+                    )
+                    cg_label = parse_label(cg_result.content, labels)
+                    cg_terminal = "GRAPH_FAST_PATH_NO_ANCHOR"
+                else:
+                    seq += 1
+                    cg_result = invoke(
+                        render_client,
+                        build_full_messages(task_id, description, labels, task_record["input_fields"]),
+                        "graph_only_full_context_fallback", "capsule_graph_no_anchor", prediction_tokens, seq
+                    )
+                    cg_label = parse_label(cg_result.content, labels)
+                    cg_terminal = "FALLBACK"
+                calls_by_condition["capsule_graph_no_anchor"].append({
+                    "call_kind": "graph_gate_ablation",
+                    "condition": "capsule_graph_no_anchor",
+                    "gate_accepted": accepted,
+                    "terminal_regime": cg_terminal,
+                    "trace_path": str(graph_trace_path.relative_to(out_dir)),
+                })
+                record_result(
+                    outputs, "capsule_graph_no_anchor", cg_label, request_hash, row["index"],
+                    calls_by_condition["capsule_graph_no_anchor"], cg_terminal, gate_trace
+                )
+
+                # Arm CA: capsule plus Anchor, deliberately without graph/gate context.
+                if capsule is not None:
+                    seq += 1
+                    ca_anchor_result = invoke_anchor("capsule_anchor_no_graph", [], seq)
+                    seq += 1
+                    ca_render_result = invoke(
+                        render_client,
+                        build_capsule_anchor_render_messages(
+                            task_id, description, labels, capsule, ca_anchor_result.content
+                        ),
+                        "capsule_anchor_renderer", "capsule_anchor_no_graph", prediction_tokens, seq
+                    )
+                    ca_label = parse_label(ca_render_result.content, labels)
+                    ca_terminal = "CAPSULE_ANCHOR_NO_GRAPH"
+                else:
+                    ca_label = None
+                    ca_terminal = "INVALID_CAPSULE"
+                record_result(
+                    outputs, "capsule_anchor_no_graph", ca_label, request_hash, row["index"],
+                    calls_by_condition["capsule_anchor_no_graph"], ca_terminal, []
+                )
+
+                # Arm CGA: fully composed capsule + graph/gates + Anchor.
+                if accepted and capsule is not None and graph is not None:
+                    seq += 1
+                    anchor_result = invoke_anchor("compiled_graph_gates", gate_trace, seq)
 
                     seq += 1
                     render_result = invoke(
@@ -917,6 +992,17 @@ def main(argv: list[str] | None = None) -> int:
             ),
             "selected_test_row_indices": selected_indices,
             "provider_request_options": provider_options,
+            "condition_design": {
+                "baseline": "original context; no capsule, graph, or Anchor",
+                "capsule_only": "capsule; graph and Anchor disabled",
+                "capsule_graph_no_anchor": "capsule plus graph/gates; Anchor disabled",
+                "capsule_anchor_no_graph": "capsule plus Anchor; graph/gates bypassed",
+                "compiled_graph_gates": "composed capsule plus graph/gates plus Anchor"
+            },
+            "conditional_graph_anchor_interaction_estimand": (
+                "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]"
+            ),
+            "interaction_analysis_ready": True,
             "archive_sha256": manifest["_archive_verification"]["archive_sha256"],
             "upstream_revision": manifest["_archive_verification"]["upstream_revision"],
             "provider_calls_enabled": not args.validate_only,
