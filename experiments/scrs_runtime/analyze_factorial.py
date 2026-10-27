@@ -198,6 +198,11 @@ def analyze_task(cases: list[dict[str, Any]], *, bootstrap_replicates: int, seed
     return {
         "task_id": next(iter(task_ids)),
         "n_paired_rows": n,
+        "sample_size_caveat": (
+            "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, "
+            "and no confirmatory inference should be made from this sample."
+            if n < 10 else None
+        ),
         "arms": accuracies,
         "full_path_paired_comparisons": pairwise,
         "conditional_graph_anchor_interaction": {
