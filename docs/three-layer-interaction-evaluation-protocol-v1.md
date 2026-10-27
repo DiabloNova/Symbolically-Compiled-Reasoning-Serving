@@ -1,6 +1,6 @@
 # SCRS composed-layer interaction evaluation protocol v1
 
-**Status:** pre-registration design amendment. This document is not a report of completed model experiments. It exists to make the primary hypothesis about *composition* testable, rather than assuming that individual-layer performance predicts composed-system performance.
+**Status:** protocol amendment after an exploratory pilot; not a report of completed model experiments. Because a small pilot has already been inspected, this amendment must be frozen before new confirmatory data collection, and exposed pilot rows must not be relabeled as confirmatory evidence. It makes the primary hypothesis about *composition* testable rather than assuming that individual-layer performance predicts composed-system performance.
 
 ## 1. Primary hypothesis
 
@@ -35,7 +35,7 @@ CA and CG are *component ablations conditioned on having a capsule*; they are no
 \widehat{\Delta}_{GA}=\frac{1}{n}\sum_{i=1}^n
 (Y_{11,i}-Y_{10,i}-Y_{01,i}+Y_{00,i}).
 ]
-A positive value indicates a positive additive interaction in correctness probability **conditional on the capsule path and the tested sample**. It is not proof of a universal interaction. Report the estimate with a paired uncertainty interval and task-wise results. If this contrast is not implemented and run, say that interaction remains unmeasured.
+A positive value indicates a positive additive interaction in correctness probability **conditional on the capsule path and the tested sample**. Report two summaries: (i) the operational contrast on all attempted rows, retaining fail-closed fallback outcomes; and (ii) a secondary mechanistic contrast among rows with schema-valid capsules. The latter conditions on a post-extraction outcome and must not be treated as an unbiased policy estimand. Neither is proof of a universal interaction. Report paired uncertainty intervals and task-wise results. If this contrast is not implemented and run, say that interaction remains unmeasured.
 
 ## 4. The gate's primary role also requires fault-injection evaluation
 
@@ -80,4 +80,4 @@ Keep the existing independent human annotation protocol as a separate outcome. D
 
 A paper may claim measured composition benefit only if paired live-model predictions and the predeclared analysis support it. It may claim a measured graph–Anchor interaction only if all four conditional arms C, CG, CA, and CGA are implemented faithfully, run on the same rows, and analysed with the declared interaction contrast. If CGA improves over baseline but the interaction contrast is inconclusive, report the overall observed difference and the uncertainty without claiming synergy. If individual arms are weak but CGA is strong, describe that as an observed pattern; do not present it as a general law from a small pilot.
 
-The theoretical results should remain labeled **analytical under stated assumptions**. Accuracy, decision-relevant semantic preservation, end-to-end latency, and billed cost remain empirical quantities and must be labeled unmeasured until their corresponding data are collected.
+The current runner is a **reference prototype**, not a complete verified implementation of the manuscript's production architecture. Before making a claim about the full paper system, map each experimental arm to the manuscript-defined Tier I/II/III operations and document any omitted runtime, routing, cache, or transport behaviour. The theoretical results should remain labeled **analytical under stated assumptions**. Accuracy, decision-relevant semantic preservation, end-to-end latency, and billed cost remain empirical quantities and must be labeled unmeasured until their corresponding data are collected.
