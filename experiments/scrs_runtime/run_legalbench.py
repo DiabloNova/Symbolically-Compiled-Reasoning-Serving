@@ -917,6 +917,14 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     "timestamp_utc": utc_now(),
                     "failed_task": task_id,
                     "failed_index": row.get("index"),
+                    "failed_request_id_hash": request_hash,
+                    "capsule_status": capsule_status,
+                    "gate_trace": gate_trace,
+                    # Retain all calls attempted for the failing case. Each call
+                    # record carries its prompt hash, request hash, status and
+                    # transport attempts, while excluding prompt text and secrets.
+                    "calls_by_condition": calls_by_condition,
+                    "case_elapsed_wall_ms": round((time.monotonic() - case_start) * 1000, 3),
                     "error_type": type(exc).__name__,
                     "error_message_redacted": str(exc),
                     "predictions_completed": len(all_cases),
