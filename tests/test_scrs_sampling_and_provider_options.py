@@ -141,6 +141,59 @@ class ProviderExtraBodyTests(unittest.TestCase):
         self.assertEqual(result.model, "resolved-provider-model")
         self.assertEqual(result.events[-1]["model"], "resolved-provider-model")
 
+    @patch("experiments.scrs_runtime.anchor_client.urlopen")
+    def test_reasoning_model_on_compatible_proxy_uses_reasoning_request_contract(self, urlopen_mock):
+        urlopen_mock.return_value = FakeResponse()
+        env = {
+            "SCRS_RENDER_BASE_URL": "https://proxy.example/v1",
+            "SCRS_RENDER_MODEL": "gpt-5.2",
+            "SCRS_RENDER_API_KEY": "test-key",
+            "SCRS_PROVIDER_MAX_RETRIES": "0",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            client = OpenAICompatibleClient.from_env("render")
+            client.chat(
+                messages=[
+                    {"role": "system", "content": "system instruction"},
+                    {"role": "user", "content": "classify"},
+                ],
+                request_id_hash="b" * 32,
+                causal_interrupt_seq=1,
+                max_tokens=16,
+                temperature=0.0,
+            )
+        sent = json.loads(urlopen_mock.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(sent["max_completion_tokens"], 16)
+        self.assertNotIn("max_tokens", sent)
+        self.assertNotIn("temperature", sent)
+        self.assertEqual(sent["messages"][0]["role"], "developer")
+
+    def test_role_specific_token_parameter_overrides_shared_default(self):
+        env = {
+            "SCRS_BASE_URL": "http://localhost:8000/v1",
+            "SCRS_MODEL": "test-model",
+            "SCRS_MAX_TOKEN_PARAMETER": "max_completion_tokens",
+            "SCRS_RENDER_MAX_TOKEN_PARAMETER": "max_tokens",
+            "SCRS_ORACLE_MAX_TOKEN_PARAMETER": "max_completion_tokens",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            render = OpenAICompatibleClient.from_env("render")
+            oracle = OpenAICompatibleClient.from_env("oracle")
+        self.assertEqual(render.max_token_parameter, "max_tokens")
+        self.assertEqual(oracle.max_token_parameter, "max_completion_tokens")
+
+    def test_reasoning_mode_can_be_explicitly_overridden_for_custom_endpoint(self):
+        env = {
+            "SCRS_RENDER_BASE_URL": "https://proxy.example/v1",
+            "SCRS_RENDER_MODEL": "custom-model",
+            "SCRS_RENDER_API_KEY": "test-key",
+            "SCRS_RENDER_REASONING_MODE": "true",
+        }
+        with patch.dict(os.environ, env, clear=True):
+            client = OpenAICompatibleClient.from_env("render")
+        self.assertTrue(client.openai_reasoning_family)
+        self.assertEqual(client.max_token_parameter, "max_completion_tokens")
+
     def test_provider_options_cannot_override_core_request_fields(self):
         with self.assertRaises(ProviderConfigurationError):
             OpenAICompatibleClient(
