@@ -7,6 +7,9 @@ on:
       - "tests/test_scrs_live_runtime.py"
       - "tests/test_scrs_mock_api.py"
       - "tests/test_scrs_runner_metrics.py"
+      - "tests/test_scrs_sampling_and_provider_options.py"
+      - "tests/test_scrs_factorial_analysis.py"
+      - "tests/test_scrs_composition_arms.py"
       - ".github/workflows/scrs-live-benchmark.yml"
       - "data/manifests/legalbench.json"
       - "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz"
@@ -60,10 +63,20 @@ jobs:
           tests/test_scrs_live_runtime.py
           tests/test_scrs_mock_api.py
           tests/test_scrs_runner_metrics.py
+          tests/test_scrs_sampling_and_provider_options.py
+          experiments/scrs_runtime/analyze_factorial.py
+          tests/test_scrs_factorial_analysis.py
+          tests/test_scrs_composition_arms.py
       - name: Run offline runtime and Anchor client tests
         run: python -m unittest discover -s tests -p "test_scrs_live_runtime.py" -v
       - name: Test benchmark metrics return contract
         run: python -m unittest discover -s tests -p "test_scrs_runner_metrics.py" -v
+      - name: Test seeded sampling and provider request options
+        run: python -m unittest discover -s tests -p "test_scrs_sampling_and_provider_options.py" -v
+      - name: Test paired graph-Anchor interaction analysis
+        run: python -m unittest discover -s tests -p "test_scrs_factorial_analysis.py" -v
+      - name: Test composed SCRS arm behavior
+        run: python -m unittest discover -s tests -p "test_scrs_composition_arms.py" -v
       - name: Validate experiment event schema
         run: python -m json.tool experiments/scrs_runtime/event-schema.v1.json > /dev/null
       - name: Verify pinned six-task dataset and graph gates
@@ -212,8 +225,8 @@ jobs:
           report = json.loads((root / "mock-diagnostics.json").read_text())
           assert report["run_status"] == "MOCK_SIMULATION_COMPLETED", report
           assert report["cases_exercised"] == 12, report
-          assert report["prediction_files_written"] == 18, report
-          assert report["condition_predictions_written"] == 36, report
+          assert report["prediction_files_written"] == 30, report
+          assert report["condition_predictions_written"] == 60, report
           assert report["mock_api_requests"] > 0, report
           assert report["external_provider_calls"] == 0, report
           assert report["model_predictions_generated"] is False, report

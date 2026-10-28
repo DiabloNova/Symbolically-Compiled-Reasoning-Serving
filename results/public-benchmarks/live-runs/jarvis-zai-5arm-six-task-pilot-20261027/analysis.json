@@ -1,0 +1,704 @@
+{
+  "analysis": "paired_layer_interaction_v1",
+  "cross_task_pooling": "not performed; tasks have different populations",
+  "schema_version": 1,
+  "task_count": 6,
+  "tasks": {
+    "abercrombie": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 1.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 1.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 1,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": 1.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 1,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": 1.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 1,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": 1.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 1,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": 1.0,
+          "partial_correct_full_wrong": 0
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "abercrombie"
+    },
+    "citation_prediction_classification": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "citation_prediction_classification"
+    },
+    "contract_qa": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "contract_qa"
+    },
+    "function_of_decision_section": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 1,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "function_of_decision_section"
+    },
+    "legal_reasoning_causality": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 1.0,
+          "correct": 1,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.20654931437723745,
+            1.0
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 1.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 1.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": -1.0,
+          "partial_correct_full_wrong": 1
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 1,
+          "mcnemar_exact_two_sided_p": 1.0,
+          "net_accuracy_difference_full_minus_comparator": -1.0,
+          "partial_correct_full_wrong": 1
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "legal_reasoning_causality"
+    },
+    "ucc_v_common_law": {
+      "analysis_boundary": "Classification correctness is not semantic-preservation annotation. Gate acceptance is not proof of capsule meaning preservation.",
+      "arms": {
+        "baseline": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_anchor_no_graph": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_graph_no_anchor": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "capsule_only": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        },
+        "compiled_graph_gates": {
+          "accuracy": 0.0,
+          "correct": 0,
+          "invalid_outputs": 0,
+          "n": 1,
+          "wilson_95_ci": [
+            0.0,
+            0.7934506856227626
+          ]
+        }
+      },
+      "conditional_graph_anchor_interaction": {
+        "all_attempted_rows": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "all attempted rows (fallbacks retained)"
+        },
+        "estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+        "valid_capsule_subset_secondary": {
+          "bootstrap_percentile_95_ci": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_replicates": 5000,
+          "bootstrap_seed": 20261027,
+          "estimate": 0.0,
+          "interpretation": "positive estimates indicate positive additive interaction in correctness for this subset and its paired rows; this is not a distribution-free or universal synergy claim",
+          "n_paired_rows": 1,
+          "subset": "rows with a schema-valid capsule (post-treatment subset)"
+        },
+        "valid_subset_caveat": "the valid-capsule subset conditions on a post-extraction outcome and is mechanistic/descriptive; the all-attempted estimate is the primary operational contrast with fallback outcomes retained"
+      },
+      "full_path_paired_comparisons": {
+        "baseline": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_anchor_no_graph": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_graph_no_anchor": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        },
+        "capsule_only": {
+          "full_correct_partial_wrong": 0,
+          "mcnemar_discordant_pairs": 0,
+          "mcnemar_exact_two_sided_p": null,
+          "net_accuracy_difference_full_minus_comparator": 0.0,
+          "partial_correct_full_wrong": 0
+        }
+      },
+      "n_paired_rows": 1,
+      "sample_size_caveat": "DESCRIPTIVE_ONLY: n<10 paired rows; bootstrap intervals can be degenerate at very small n, and no confirmatory inference should be made from this sample.",
+      "task_id": "ucc_v_common_law"
+    }
+  }
+}

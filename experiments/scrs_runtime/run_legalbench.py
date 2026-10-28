@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import os
+import random
 import sys
 import tarfile
 import time
@@ -38,6 +39,7 @@ from experiments.scrs_runtime.scrs_runtime import (  # noqa: E402
     CapsuleValidationError,
     build_capsule_messages,
     build_capsule_only_messages,
+    build_capsule_anchor_render_messages,
     build_compiled_render_messages,
     build_full_messages,
     build_task_record,
@@ -57,7 +59,7 @@ DATA_MANIFEST = ROOT / "data" / "manifests" / "legalbench.json"
 DATA_ARCHIVE = ROOT / "data" / "public" / "legalbench" / "extra-licensed-snapshots-v1.tar.gz"
 EXPECTED_ARCHIVE_SHA256 = "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a"
 EXPECTED_UPSTREAM_REVISION = "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
-CONDITIONS = ("baseline", "capsule_only", "compiled_graph_gates")
+CONDITIONS = ("baseline", "capsule_only", "capsule_graph_no_anchor", "capsule_anchor_no_graph", "compiled_graph_gates")
 
 
 def utc_now() -> str:
@@ -66,6 +68,104 @@ def utc_now() -> str:
 
 def digest_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def apply_seeded_sample(
+    tasks: dict[str, list[dict[str, Any]]],
+    max_examples: int,
+    sample_seed: int | None,
+) -> None:
+    """Put a stable, task-specific random sample first while retaining all source rows."""
+    if sample_seed is None or max_examples <= 0:
+        return
+    for task_id, rows in tasks.items():
+        sample_size = min(max_examples, len(rows))
+        seed_material = f"scrs-sample-v1:{sample_seed}:{task_id}".encode("utf-8")
+        stable_seed = int.from_bytes(hashlib.sha256(seed_material).digest()[:8], "big")
+        sampled = random.Random(stable_seed).sample(rows, sample_size)
+        sampled_indices = {row["index"] for row in sampled}
+        tasks[task_id] = (
+            [row for row in rows if row["index"] in sampled_indices]
+            + [row for row in rows if row["index"] not in sampled_indices]
+        )
+
+
+def selected_test_row_indices(
+    tasks: dict[str, list[dict[str, Any]]], max_examples: int
+) -> dict[str, list[int]]:
+    return {
+        task_id: [
+            row["index"]
+            for row in (rows if max_examples <= 0 else rows[:max_examples])
+        ]
+        for task_id, rows in tasks.items()
+    }
+
+
+def load_exclusion_indices(path: Path | None) -> dict[str, list[int]]:
+    """Load an explicit task -> test-row-index exclusion map, if supplied."""
+    if path is None:
+        return {}
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("Excluded test-row JSON must be an object mapping task IDs to index arrays.")
+    result: dict[str, list[int]] = {}
+    for task_id, indices in value.items():
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("Excluded test-row map contains a blank/non-string task ID.")
+        if not isinstance(indices, list) or any(
+            not isinstance(index, int) or isinstance(index, bool) or index < 0
+            for index in indices
+        ):
+            raise ValueError(f"Excluded indices for {task_id!r} must be non-negative integer arrays.")
+        if len(indices) != len(set(indices)):
+            raise ValueError(f"Excluded indices for {task_id!r} contain duplicates.")
+        result[task_id] = list(indices)
+    return result
+
+
+def exclude_test_rows(
+    tasks: dict[str, list[dict[str, Any]]],
+    exclusions: dict[str, list[int]],
+) -> dict[str, list[int]]:
+    """Remove explicitly exposed rows from the active pools and return applied exclusions."""
+    applied: dict[str, list[int]] = {}
+    for task_id, rows in list(tasks.items()):
+        requested = exclusions.get(task_id, [])
+        available = {row["index"] for row in rows}
+        missing = sorted(set(requested) - available)
+        if missing:
+            raise ValueError(
+                f"{task_id}: requested exclusions are not present in the pinned test rows: {missing}."
+            )
+        remove = set(requested)
+        remaining = [row for row in rows if row["index"] not in remove]
+        if rows and not remaining:
+            raise ValueError(f"{task_id}: exclusions remove every available test row.")
+        tasks[task_id] = remaining
+        applied[task_id] = sorted(remove)
+    return applied
+
+
+def provider_request_options_metadata() -> dict[str, Any]:
+    raw = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
+    try:
+        extra_body = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        raise ValueError("SCRS_PROVIDER_EXTRA_BODY_JSON must be valid JSON.") from exc
+    if not isinstance(extra_body, dict):
+        raise ValueError("SCRS_PROVIDER_EXTRA_BODY_JSON must decode to a JSON object.")
+    reserved = {"model", "messages", "max_tokens", "max_completion_tokens", "stream", "temperature"}
+    overlap = sorted(reserved.intersection(extra_body))
+    if overlap:
+        raise ValueError(
+            "SCRS_PROVIDER_EXTRA_BODY_JSON cannot override core request field(s): "
+            + ", ".join(overlap)
+        )
+    return {
+        "extra_body_keys": sorted(extra_body),
+        "extra_body_sha256": digest_text(canonical_json(extra_body)),
+    }
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -188,7 +288,8 @@ def annotate_events(events: list[dict[str, Any]], run_id: str, task_id: str,
 
 
 def logical_interrupt_event(request_id_hash: str, sequence: int, run_id: str,
-                            task_id: str, index: int, start_ms: float, end_ms: float) -> dict[str, Any]:
+                            task_id: str, index: int, start_ms: float, end_ms: float,
+                            condition: str = "compiled_graph_gates") -> dict[str, Any]:
     event_type = "anchor_interrupt"
     event_id = digest_text(f"{request_id_hash}:{sequence}:0:{event_type}")[:32]
     return {
@@ -223,7 +324,7 @@ def logical_interrupt_event(request_id_hash: str, sequence: int, run_id: str,
         "benchmark_run_id": run_id,
         "task_id": task_id,
         "row_index": index,
-        "condition": "compiled_graph_gates",
+        "condition": condition,
         "call_kind": "logical_interrupt",
     }
 
@@ -407,6 +508,12 @@ def validate_mode(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, di
                 "input_sha256": record["source_input_sha256"],
                 "full_prompt_sha256": digest_text(canonical_json(msgs)),
                 "capsule_prompt_sha256": digest_text(canonical_json(capsule_msgs)),
+                "graph_no_anchor_prompt_sha256": digest_text(canonical_json(build_compiled_render_messages(
+                    task_id, record["description"], record["labels"], capsule, graph, trace, None
+                ))),
+                "capsule_anchor_render_prompt_sha256": digest_text(canonical_json(build_capsule_anchor_render_messages(
+                    task_id, record["description"], record["labels"], capsule, "UNKNOWN"
+                ))),
                 "gate_count": len(trace) - 1,
                 "gate_terminal": trace[-1]["decision"],
             })
@@ -520,6 +627,87 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 append_jsonl(event_path, annotate_events(result.events, run_id, task_id, row["index"], condition, call_kind))
                 return result
 
+            def invoke_anchor(condition: str, graph_trace: list[dict[str, Any]], sequence: int):
+                nonlocal total_provider_calls, total_confirmed_generations
+                nonlocal total_reported_input_tokens, total_reported_output_tokens
+                if capsule is None:
+                    raise ValueError("Anchor ablation cannot run without a valid capsule.")
+                logical_start = time.monotonic() * 1000
+                anchor_prompt = {
+                    "task": description,
+                    "allowed_labels": labels,
+                    "capsule": capsule["payload"],
+                    "verified_graph_trace": graph_trace,
+                    "instruction": (
+                        "Return a compact anchor hint of at most five tokens. Do not return a full answer, "
+                        "do not invent facts, and do not include chain-of-thought. If the evidence is insufficient, "
+                        "return only the word UNKNOWN."
+                    ),
+                }
+                prompt_hash = digest_text(canonical_json(anchor_prompt))
+                try:
+                    result = anchor_client.generate_anchors(
+                        task_description=description,
+                        allowed_labels=labels,
+                        capsule=capsule["payload"],
+                        graph_trace=graph_trace,
+                        request_id_hash=request_hash,
+                        causal_interrupt_seq=sequence,
+                    )
+                except ProviderRequestError as exc:
+                    logical_end = time.monotonic() * 1000
+                    logical = logical_interrupt_event(
+                        request_hash, sequence, run_id, task_id, row["index"],
+                        logical_start, logical_end, condition
+                    )
+                    failed_events = annotate_events(
+                        list(getattr(exc, "events", [])), run_id, task_id,
+                        row["index"], condition, "anchor_generation"
+                    )
+                    append_jsonl(event_path, [logical, *failed_events])
+                    failed_attempts = list(getattr(exc, "attempts", []))
+                    total_provider_calls += len(failed_attempts)
+                    total_confirmed_generations += sum(
+                        1 for e in failed_events if e.get("event_type") == "anchor_provider_response"
+                    )
+                    calls_by_condition[condition].append({
+                        "call_kind": "anchor_generation",
+                        "condition": condition,
+                        "causal_sequence": sequence,
+                        "model": anchor_provider.model,
+                        "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
+                        "attempt_count": len(failed_attempts),
+                        "attempts": failed_attempts,
+                        "usage": None,
+                        "usage_evidence": "UNAVAILABLE",
+                        "provider_request_id_hash": None,
+                        "prompt_sha256": prompt_hash,
+                        "request_id_hash": request_hash,
+                        "status": "FAILED_PROVIDER_REQUEST",
+                    })
+                    raise
+                logical_end = time.monotonic() * 1000
+                logical = logical_interrupt_event(
+                    request_hash, sequence, run_id, task_id, row["index"],
+                    logical_start, logical_end, condition
+                )
+                append_jsonl(event_path, [logical])
+                append_jsonl(event_path, annotate_events(
+                    result.events, run_id, task_id, row["index"], condition, "anchor_generation"
+                ))
+                total_provider_calls += len(result.attempts)
+                total_confirmed_generations += sum(
+                    1 for e in result.events if e.get("event_type") == "anchor_provider_response"
+                )
+                if result.usage:
+                    total_reported_input_tokens += result.usage["input_tokens"]
+                    total_reported_output_tokens += result.usage["output_tokens"]
+                call = call_record(result, "anchor_generation", condition, sequence)
+                call["prompt_sha256"] = prompt_hash
+                call["request_id_hash"] = request_hash
+                calls_by_condition[condition].append(call)
+                return result
+
             try:
                 # Condition A: full-context baseline.
                 seq += 1
@@ -532,7 +720,7 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 record_result(outputs, "baseline", baseline_label, request_hash, row["index"],
                               calls_by_condition["baseline"], "BASELINE")
 
-                # One capsule is compiled for the two compressed conditions. Its
+                # One capsule is compiled for the capsule-dependent conditions. Its
                 # preprocessing usage is allocated to both condition-level costs,
                 # while the run-level usage counts the provider call only once.
                 seq += 1
@@ -541,13 +729,15 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     build_capsule_messages(task_id, description, labels, task_record["input_fields"]),
                     "capsule_extraction", "capsule_only", capsule_tokens, seq
                 )
-                # The physical extraction call is shared across the two compressed paths.
-                # Its usage is allocated to both counterfactual path budgets, while the run total
-                # counts the actual provider request exactly once.
-                shared_capsule_call = dict(calls_by_condition["capsule_only"][-1])
-                shared_capsule_call["condition"] = "compiled_graph_gates"
-                shared_capsule_call["cost_allocation"] = "shared_preprocessing_counterfactual"
-                calls_by_condition["compiled_graph_gates"].append(shared_capsule_call)
+                # One physical extraction is shared by every capsule-dependent arm.
+                # Attribute it to each counterfactual path budget, but count it once in run totals.
+                for compressed_condition in (
+                    "capsule_graph_no_anchor", "capsule_anchor_no_graph", "compiled_graph_gates"
+                ):
+                    shared_capsule_call = dict(calls_by_condition["capsule_only"][-1])
+                    shared_capsule_call["condition"] = compressed_condition
+                    shared_capsule_call["cost_allocation"] = "shared_preprocessing_counterfactual"
+                    calls_by_condition[compressed_condition].append(shared_capsule_call)
                 try:
                     payload = parse_capsule_payload(capsule_result.content)
                     capsule = create_capsule(task_id, task_record["task_contract_version"], revision,
@@ -599,81 +789,65 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                     "capsule_status": capsule_status, "capsule": capsule,
                     "compiled_graph": graph, "gate_trace": gate_trace,
                 })
+                # Arm CG: capsule plus graph/gates, but with no Anchor request or hint.
                 if accepted and capsule is not None and graph is not None:
-                    # One logical interrupt is accepted by the compiled renderer;
-                    # transport retries and provider generations are separately logged.
-                    logical_start = time.monotonic() * 1000
                     seq += 1
-                    try:
-                        anchor_result = anchor_client.generate_anchors(
-                            task_description=description,
-                            allowed_labels=labels,
-                            capsule=capsule["payload"],
-                            graph_trace=gate_trace,
-                            request_id_hash=request_hash,
-                            causal_interrupt_seq=seq,
-                        )
-                    except ProviderRequestError as exc:
-                        logical_end = time.monotonic() * 1000
-                        logical = logical_interrupt_event(
-                            request_hash, seq, run_id, task_id, row["index"], logical_start, logical_end
-                        )
-                        failed_events = annotate_events(
-                            list(getattr(exc, "events", [])), run_id, task_id,
-                            row["index"], "compiled_graph_gates", "anchor_generation"
-                        )
-                        append_jsonl(event_path, [logical, *failed_events])
-                        failed_attempts = list(getattr(exc, "attempts", []))
-                        total_provider_calls += len(failed_attempts)
-                        total_confirmed_generations += sum(
-                            1 for e in failed_events if e.get("event_type") == "anchor_provider_response"
-                        )
-                        calls_by_condition["compiled_graph_gates"].append({
-                            "call_kind": "anchor_generation",
-                            "condition": "compiled_graph_gates",
-                            "causal_sequence": seq,
-                            "model": anchor_provider.model,
-                            "duration_ms": round(sum(float(a.get("duration_ms", 0.0)) for a in failed_attempts), 3),
-                            "attempt_count": len(failed_attempts),
-                            "attempts": failed_attempts,
-                            "usage": None,
-                            "usage_evidence": "UNAVAILABLE",
-                            "provider_request_id_hash": None,
-                            "prompt_sha256": digest_text(canonical_json({
-                                "task": description, "allowed_labels": labels,
-                                "capsule": capsule["payload"], "verified_graph_trace": gate_trace,
-                            })),
-                            "request_id_hash": request_hash,
-                            "status": "FAILED_PROVIDER_REQUEST",
-                        })
-                        raise
-                    logical_end = time.monotonic() * 1000
-                    logical = logical_interrupt_event(request_hash, seq, run_id, task_id, row["index"],
-                                                      logical_start, logical_end)
-                    append_jsonl(event_path, [logical])
-                    append_jsonl(event_path, annotate_events(anchor_result.events, run_id, task_id,
-                                                             row["index"], "compiled_graph_gates", "anchor_generation"))
-                    total_provider_calls += len(anchor_result.attempts)
-                    total_confirmed_generations += sum(
-                        1 for e in anchor_result.events if e.get("event_type") == "anchor_provider_response"
-                    )
-                    if anchor_result.usage:
-                        total_reported_input_tokens += anchor_result.usage["input_tokens"]
-                        total_reported_output_tokens += anchor_result.usage["output_tokens"]
-                    calls_by_condition["compiled_graph_gates"].append(
-                        call_record(anchor_result, "anchor_generation", "compiled_graph_gates", seq)
-                    )
-                    calls_by_condition["compiled_graph_gates"][-1]["prompt_sha256"] = digest_text(canonical_json({
-                        "task": description,
-                        "allowed_labels": labels,
-                        "capsule": capsule["payload"],
-                        "verified_graph_trace": gate_trace,
-                        "instruction": (
-                            "Return a compact anchor hint of at most five tokens; do not return a full answer, "
-                            "do not invent facts, and do not include chain-of-thought. If evidence is insufficient, return UNKNOWN."
+                    cg_result = invoke(
+                        render_client,
+                        build_compiled_render_messages(
+                            task_id, description, labels, capsule, graph, gate_trace, None
                         ),
-                    }))
-                    calls_by_condition["compiled_graph_gates"][-1]["request_id_hash"] = request_hash
+                        "graph_only_renderer", "capsule_graph_no_anchor", prediction_tokens, seq
+                    )
+                    cg_label = parse_label(cg_result.content, labels)
+                    cg_terminal = "GRAPH_FAST_PATH_NO_ANCHOR"
+                else:
+                    seq += 1
+                    cg_result = invoke(
+                        render_client,
+                        build_full_messages(task_id, description, labels, task_record["input_fields"]),
+                        "graph_only_full_context_fallback", "capsule_graph_no_anchor", prediction_tokens, seq
+                    )
+                    cg_label = parse_label(cg_result.content, labels)
+                    cg_terminal = "FALLBACK"
+                calls_by_condition["capsule_graph_no_anchor"].append({
+                    "call_kind": "graph_gate_ablation",
+                    "condition": "capsule_graph_no_anchor",
+                    "gate_accepted": accepted,
+                    "terminal_regime": cg_terminal,
+                    "trace_path": str(graph_trace_path.relative_to(out_dir)),
+                })
+                record_result(
+                    outputs, "capsule_graph_no_anchor", cg_label, request_hash, row["index"],
+                    calls_by_condition["capsule_graph_no_anchor"], cg_terminal, gate_trace
+                )
+
+                # Arm CA: capsule plus Anchor, deliberately without graph/gate context.
+                if capsule is not None:
+                    seq += 1
+                    ca_anchor_result = invoke_anchor("capsule_anchor_no_graph", [], seq)
+                    seq += 1
+                    ca_render_result = invoke(
+                        render_client,
+                        build_capsule_anchor_render_messages(
+                            task_id, description, labels, capsule, ca_anchor_result.content
+                        ),
+                        "capsule_anchor_renderer", "capsule_anchor_no_graph", prediction_tokens, seq
+                    )
+                    ca_label = parse_label(ca_render_result.content, labels)
+                    ca_terminal = "CAPSULE_ANCHOR_NO_GRAPH"
+                else:
+                    ca_label = None
+                    ca_terminal = "INVALID_CAPSULE"
+                record_result(
+                    outputs, "capsule_anchor_no_graph", ca_label, request_hash, row["index"],
+                    calls_by_condition["capsule_anchor_no_graph"], ca_terminal, []
+                )
+
+                # Arm CGA: fully composed capsule + graph/gates + Anchor.
+                if accepted and capsule is not None and graph is not None:
+                    seq += 1
+                    anchor_result = invoke_anchor("compiled_graph_gates", gate_trace, seq)
 
                     seq += 1
                     render_result = invoke(
@@ -751,6 +925,15 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 write_json(out_dir / "failure.json", failure)
                 raise
 
+    observed_model_ids = sorted({
+        str(call["model"])
+        for case in all_cases
+        for condition_calls in case.get("call_usage_by_condition", {}).values()
+        for call in condition_calls
+        if isinstance(call, dict) and isinstance(call.get("model"), str) and call["model"].strip()
+    })
+    model_identity_consistency = len(observed_model_ids) == 1
+
     metrics: dict[str, Any] = {}
     for task_id, task_rows in tasks.items():
         selected_rows = task_rows if max_examples <= 0 else task_rows[:max_examples]
@@ -776,14 +959,15 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
                 "run_id": run_id,
                 "task_id": task_id,
                 "condition": condition,
-                "model": render_client.model,
+                "requested_model_route": render_client.model,
+                "observed_model_ids": observed_model_ids,
                 "upstream_revision": sidecars[task_id]["upstream_revision"],
                 "gold_sha256": sidecars[task_id]["normalized_jsonl_sha256"],
                 "predictions": preds,
             })
     summary = {
         "run_id": run_id,
-        "run_status": "COMPLETED",
+        "run_status": "COMPLETED" if model_identity_consistency else "COMPLETED_MODEL_ROUTING_VARIATION",
         "timestamp_utc": utc_now(),
         "experiment_type": "live-provider-paired-legalbench-pilot",
         "conditions": list(CONDITIONS),
@@ -792,6 +976,10 @@ def run_live(tasks: dict[str, list[dict[str, Any]]], sidecars: dict[str, dict[st
             "render_model": render_client.model,
             "oracle_model": oracle_client.model,
             "anchor_model": anchor_provider.model,
+            "model_id_semantics": "render_model/oracle_model/anchor_model are requested model IDs or router aliases; per-call model fields preserve the provider-reported resolved model.",
+            "observed_model_ids": observed_model_ids,
+            "model_identity_consistency": model_identity_consistency,
+            "provider_min_interval_seconds": getattr(render_client, "min_interval_seconds", 0.0),
             "render_endpoint": render_client.base_url,
             "oracle_endpoint": oracle_client.base_url,
             "anchor_endpoint": anchor_provider.base_url,
@@ -822,7 +1010,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tasks", default="all", help="all or comma-separated allowlisted task IDs")
     parser.add_argument("--max-examples", type=int, default=2,
-                        help="First N rows per selected task; use 0 or --full for all test rows.")
+                        help="N rows per selected task; defaults to the first N unless --sample-seed is set.")
+    parser.add_argument("--sample-seed", type=int, default=None,
+                        help="Stable task-specific random sampling seed; records selected test row indices.")
+    parser.add_argument("--exclude-test-indices-json", type=Path, default=None,
+                        help="JSON object mapping task IDs to test row indices that must be excluded.")
     parser.add_argument("--full", action="store_true", help="Use every test row for each selected task.")
     parser.add_argument("--validate-only", action="store_true", help="Verify data/gates/prompts without provider calls.")
     parser.add_argument("--output-root", type=Path, default=ROOT / "results/public-benchmarks/live-runs")
@@ -842,12 +1034,59 @@ def main(argv: list[str] | None = None) -> int:
         manifest = json.loads(DATA_MANIFEST.read_text(encoding="utf-8"))
         task_ids = exact_task_ids(manifest, args.tasks)
         manifest, tasks, sidecars = load_verified_task_data(task_ids)
+        available_test_rows_original = {task_id: len(rows) for task_id, rows in tasks.items()}
+        exclusion_map = load_exclusion_indices(args.exclude_test_indices_json)
+        applied_exclusions = exclude_test_rows(tasks, exclusion_map)
+        available_test_rows = {task_id: len(rows) for task_id, rows in tasks.items()}
+        apply_seeded_sample(tasks, args.max_examples, args.sample_seed)
+        selected_indices = selected_test_row_indices(tasks, args.max_examples)
+        provider_options = provider_request_options_metadata()
         run_manifest = {
             "run_id": run_id,
             "created_at_utc": utc_now(),
             "tasks": task_ids,
             "split": "test",
             "selected_examples_per_task": "all" if args.max_examples == 0 else args.max_examples,
+            "test_rows_available_original": available_test_rows_original,
+            "test_rows_excluded_from_pool": applied_exclusions,
+            "test_rows_available_after_exclusion": available_test_rows,
+            "test_rows_available": available_test_rows,
+            "exclusion_map_path": str(args.exclude_test_indices_json) if args.exclude_test_indices_json else None,
+            "sample_seed": args.sample_seed,
+            "sample_selection_strategy": (
+                "all_rows" if args.max_examples == 0
+                else "sha256_seeded_random_sample_v1" if args.sample_seed is not None
+                else "first_n_rows"
+            ),
+            "selected_test_row_indices": selected_indices,
+            "provider_request_options": provider_options,
+            "provider_min_interval_seconds": float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0")),
+            "provider_configuration": {
+                "shared_base_url": os.getenv("SCRS_BASE_URL", ""),
+                "shared_model_requested": os.getenv("SCRS_MODEL", ""),
+                "render_base_url_override": os.getenv("SCRS_RENDER_BASE_URL", ""),
+                "render_model_override": os.getenv("SCRS_RENDER_MODEL", ""),
+                "oracle_base_url_override": os.getenv("SCRS_ORACLE_BASE_URL", ""),
+                "oracle_model_override": os.getenv("SCRS_ORACLE_MODEL", ""),
+                "anchor_base_url_override": os.getenv("SCRS_ANCHOR_BASE_URL", ""),
+                "anchor_model_override": os.getenv("SCRS_ANCHOR_MODEL", ""),
+                "timeout_seconds": float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60")),
+                "max_retries": int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2")),
+                "min_interval_seconds": float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0")),
+                "allow_unauthenticated_endpoint": os.getenv("SCRS_ALLOW_UNAUTHENTICATED_ENDPOINT", "").lower() == "true",
+                "api_key_value_recorded": False
+            },
+            "condition_design": {
+                "baseline": "original context; no capsule, graph, or Anchor",
+                "capsule_only": "capsule; graph and Anchor disabled",
+                "capsule_graph_no_anchor": "capsule plus graph/gates; Anchor disabled",
+                "capsule_anchor_no_graph": "capsule plus Anchor; graph/gates bypassed",
+                "compiled_graph_gates": "composed capsule plus graph/gates plus Anchor"
+            },
+            "conditional_graph_anchor_interaction_estimand": (
+                "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]"
+            ),
+            "interaction_analysis_ready": True,
             "archive_sha256": manifest["_archive_verification"]["archive_sha256"],
             "upstream_revision": manifest["_archive_verification"]["upstream_revision"],
             "provider_calls_enabled": not args.validate_only,

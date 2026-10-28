@@ -1,0 +1,131 @@
+{
+  "capsule": {
+    "allowed_labels_sha256": "591e4424a227942cfaa898ff551771f8d762d17663e9e4b77d74c8d983582885",
+    "capsule_schema_version": 1,
+    "payload": {
+      "ambiguities_or_unknowns": [],
+      "conditions_or_qualifiers": [
+        "Prevention from working at elevation",
+        "Demotion as a tangible employment action"
+      ],
+      "decision_relevant_facts": [
+        "Wallace was prevented from working at elevation",
+        "A demotion is considered a tangible employment action"
+      ],
+      "exceptions_or_contraindications": []
+    },
+    "source_input_sha256": "8183aad1ed235700fe184f59b2999ce457a1a81901bc738317c65be1353472ff",
+    "task_contract_version": "legalbench-v1-e92cdd8b726a2003ec07",
+    "task_id": "citation_prediction_classification",
+    "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
+  },
+  "capsule_status": "VALID",
+  "compiled_graph": {
+    "allowed_labels_sha256": "591e4424a227942cfaa898ff551771f8d762d17663e9e4b77d74c8d983582885",
+    "execution_contract": "fixed-order; explicit affirmative checks; fallback on any rejection",
+    "graph_id": "scrs-legalbench-decision-graph-v1",
+    "graph_schema_version": 1,
+    "nodes": [
+      {
+        "id": "N1",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_TASK_ID"
+      },
+      {
+        "id": "N2",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_CONTRACT_VERSION"
+      },
+      {
+        "id": "N3",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_UPSTREAM_REVISION"
+      },
+      {
+        "id": "N4",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_SOURCE_PROVENANCE"
+      },
+      {
+        "id": "N5",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_ALLOWED_LABEL_INVENTORY"
+      },
+      {
+        "id": "N6",
+        "on_fail": "FALLBACK",
+        "op": "CHECK_CAPSULE_SCHEMA"
+      },
+      {
+        "id": "N7",
+        "op": "RENDER_WITH_ANCHOR_HINT",
+        "terminal": "FAST_PATH"
+      }
+    ],
+    "source_input_sha256": "8183aad1ed235700fe184f59b2999ce457a1a81901bc738317c65be1353472ff",
+    "task_contract_version": "legalbench-v1-e92cdd8b726a2003ec07",
+    "task_id": "citation_prediction_classification",
+    "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
+  },
+  "gate_trace": [
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_TASK_ID",
+      "reason_code": "PASS",
+      "sequence": 1
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_CONTRACT_VERSION",
+      "reason_code": "PASS",
+      "sequence": 2
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_UPSTREAM_REVISION",
+      "reason_code": "PASS",
+      "sequence": 3
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_SOURCE_PROVENANCE",
+      "reason_code": "PASS",
+      "sequence": 4
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_ALLOWED_LABEL_INVENTORY",
+      "reason_code": "PASS",
+      "sequence": 5
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_CAPSULE_SCHEMA",
+      "reason_code": "PASS",
+      "sequence": 6
+    },
+    {
+      "decision": "ACCEPT",
+      "details_redacted": "gate satisfied",
+      "gate_id": "CHECK_GRAPH_ORDER",
+      "reason_code": "PASS",
+      "sequence": 7
+    },
+    {
+      "decision": "FAST_PATH",
+      "details_redacted": "all checks passed",
+      "gate_id": "TERMINAL",
+      "reason_code": "ALL_GATES_ACCEPTED",
+      "sequence": 8
+    }
+  ],
+  "index": 37,
+  "run_id": "jarvis-zai-5arm-one-row-20261027-citation",
+  "task_id": "citation_prediction_classification"
+}

@@ -1,0 +1,18 @@
+{
+  "condition": "capsule_only",
+  "gold_sha256": "33cd8122b6a0dbb6f4fa23e0e67f0bcce9db5e53ff03b4b93bba22fbe337c87f",
+  "observed_model_ids": [
+    "glm-4-flash"
+  ],
+  "predictions": [
+    {
+      "index": 37,
+      "prediction": "Yes",
+      "prediction_valid": true
+    }
+  ],
+  "requested_model_route": "zai/glm-4-flash",
+  "run_id": "jarvis-zai-5arm-one-row-20261027-citation",
+  "task_id": "citation_prediction_classification",
+  "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
+}
