@@ -1,0 +1,38 @@
+{
+  "archive_sha256": "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a",
+  "condition_design": {
+    "baseline": "original context; no capsule, graph, or Anchor",
+    "capsule_anchor_no_graph": "capsule plus Anchor; graph/gates bypassed",
+    "capsule_graph_no_anchor": "capsule plus graph/gates; Anchor disabled",
+    "capsule_only": "capsule; graph and Anchor disabled",
+    "compiled_graph_gates": "composed capsule plus graph/gates plus Anchor"
+  },
+  "conditional_graph_anchor_interaction_estimand": "mean[(CGA correctness) - (CG correctness) - (CA correctness) + (C correctness)]",
+  "created_at_utc": "2026-10-27T12:10:04.338913+00:00",
+  "credentials_recorded": false,
+  "interaction_analysis_ready": true,
+  "outputs_directory": "/tmp/scrs-live-final/jarvis-zai-5arm-one-row-20261027-abercrombie",
+  "provider_calls_enabled": true,
+  "provider_min_interval_seconds": 5.0,
+  "provider_request_options": {
+    "extra_body_keys": [],
+    "extra_body_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "run_id": "jarvis-zai-5arm-one-row-20261027-abercrombie",
+  "sample_seed": 20261027,
+  "sample_selection_strategy": "sha256_seeded_random_sample_v1",
+  "selected_examples_per_task": 1,
+  "selected_test_row_indices": {
+    "abercrombie": [
+      87
+    ]
+  },
+  "split": "test",
+  "tasks": [
+    "abercrombie"
+  ],
+  "test_rows_available": {
+    "abercrombie": 95
+  },
+  "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826"
+}

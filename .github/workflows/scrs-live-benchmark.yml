@@ -1,0 +1,197 @@
+name: SCRS live benchmark prototype
+
+on:
+  pull_request:
+    paths:
+      - "experiments/scrs_runtime/**"
+      - "tests/test_scrs_live_runtime.py"
+      - "tests/test_scrs_mock_api.py"
+      - "tests/test_scrs_runner_metrics.py"
+      - "tests/test_scrs_sampling_and_provider_options.py"
+      - "tests/test_scrs_factorial_analysis.py"
+      - "tests/test_scrs_composition_arms.py"
+      - ".github/workflows/scrs-live-benchmark.yml"
+      - "data/manifests/legalbench.json"
+      - "data/public/legalbench/extra-licensed-snapshots-v1.tar.gz"
+      - "results/public-benchmarks/experiment-plan.v1.json"
+  workflow_dispatch:
+    inputs:
+      tasks:
+        description: "Comma-separated tasks or all"
+        required: true
+        default: "all"
+        type: string
+      max_examples:
+        description: "Rows per task for a pilot; ignored when full_benchmark=true"
+        required: true
+        default: "2"
+        type: string
+      full_benchmark:
+        description: "Run every row in the selected test split(s); provider usage can be significant"
+        required: true
+        default: false
+        type: boolean
+      model:
+        description: "Exact OpenAI-compatible model ID"
+        required: true
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  offline-validation:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile runtime and client
+        run: >-
+          python -m py_compile
+          experiments/scrs_runtime/anchor_client.py
+          experiments/scrs_runtime/scrs_runtime.py
+          experiments/scrs_runtime/run_legalbench.py
+          experiments/scrs_runtime/mock_api.py
+          experiments/scrs_runtime/run_mock_benchmark.py
+          tests/test_scrs_live_runtime.py
+          tests/test_scrs_mock_api.py
+          tests/test_scrs_runner_metrics.py
+          tests/test_scrs_sampling_and_provider_options.py
+          experiments/scrs_runtime/analyze_factorial.py
+          tests/test_scrs_factorial_analysis.py
+          tests/test_scrs_composition_arms.py
+      - name: Run offline runtime and Anchor client tests
+        run: python -m unittest discover -s tests -p "test_scrs_live_runtime.py" -v
+      - name: Test benchmark metrics return contract
+        run: python -m unittest discover -s tests -p "test_scrs_runner_metrics.py" -v
+      - name: Test seeded sampling and provider request options
+        run: python -m unittest discover -s tests -p "test_scrs_sampling_and_provider_options.py" -v
+      - name: Test paired graph-Anchor interaction analysis
+        run: python -m unittest discover -s tests -p "test_scrs_factorial_analysis.py" -v
+      - name: Test composed SCRS arm behavior
+        run: python -m unittest discover -s tests -p "test_scrs_composition_arms.py" -v
+      - name: Validate experiment event schema
+        run: python -m json.tool experiments/scrs_runtime/event-schema.v1.json > /dev/null
+      - name: Verify pinned six-task dataset and graph gates
+        run: >-
+          python experiments/scrs_runtime/run_legalbench.py
+          --tasks all --max-examples 2 --validate-only
+          --output-root "$RUNNER_TEMP/scrs-validation"
+          --run-id "ci-validation"
+
+  live-predictions:
+    # Never execute a selectable PR branch while provider secrets are present.
+    # Live inference is restricted to explicit dispatches from trusted main.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SCRS_API_KEY: ${{ secrets.SCRS_API_KEY }}
+      SCRS_BASE_URL: ${{ vars.SCRS_BASE_URL }}
+      SCRS_MODEL: ${{ inputs.model }}
+      SCRS_RENDER_MODEL: ${{ vars.SCRS_RENDER_MODEL }}
+      SCRS_RENDER_BASE_URL: ${{ vars.SCRS_RENDER_BASE_URL }}
+      SCRS_RENDER_API_KEY: ${{ secrets.SCRS_RENDER_API_KEY }}
+      SCRS_ORACLE_MODEL: ${{ vars.SCRS_ORACLE_MODEL }}
+      SCRS_ORACLE_BASE_URL: ${{ vars.SCRS_ORACLE_BASE_URL }}
+      SCRS_ORACLE_API_KEY: ${{ secrets.SCRS_ORACLE_API_KEY }}
+      SCRS_ANCHOR_MODEL: ${{ vars.SCRS_ANCHOR_MODEL }}
+      SCRS_ANCHOR_BASE_URL: ${{ vars.SCRS_ANCHOR_BASE_URL }}
+      SCRS_ANCHOR_API_KEY: ${{ secrets.SCRS_ANCHOR_API_KEY }}
+    steps:
+      - name: Check out selected branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require explicit provider configuration
+        shell: bash
+        run: |
+          if [[ -z "${SCRS_MODEL}" || -z "${SCRS_API_KEY}" ]]; then
+            echo "Live inference requires SCRS_MODEL workflow input and SCRS_API_KEY repository secret."
+            exit 2
+          fi
+      - name: Run live paired prediction pilot
+        shell: bash
+        env:
+          INPUT_TASKS: ${{ inputs.tasks }}
+          INPUT_MAX_EXAMPLES: ${{ inputs.max_examples }}
+          INPUT_FULL: ${{ inputs.full_benchmark }}
+        run: |
+          args=(--tasks "$INPUT_TASKS" --max-examples "$INPUT_MAX_EXAMPLES")
+          if [[ "$INPUT_FULL" == "true" ]]; then args+=(--full); fi
+          python experiments/scrs_runtime/run_legalbench.py "${args[@]}"
+      - name: Upload live run records, metrics, and prediction files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrs-live-benchmark-records-${{ github.run_id }}
+          path: results/public-benchmarks/live-runs/
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  mock-pipeline-smoke-test:
+    if: github.event_name == 'pull_request'
+    needs: offline-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test synthetic API contracts
+        run: python -m unittest discover -s tests -p "test_scrs_mock_api.py" -v
+      - name: Execute complete pipeline against local mock API
+        run: >-
+          python experiments/scrs_runtime/run_mock_benchmark.py
+          --tasks all --max-examples 2
+          --output-root "results/public-benchmarks/mock-runs"
+          --run-id "ci-mock"
+      - name: Assert synthetic evidence boundaries
+        env:
+          MOCK_OUTPUT: "results/public-benchmarks/mock-runs/ci-mock"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["MOCK_OUTPUT"])
+          report = json.loads((root / "mock-diagnostics.json").read_text())
+          assert report["run_status"] == "MOCK_SIMULATION_COMPLETED", report
+          assert report["cases_exercised"] == 12, report
+          assert report["prediction_files_written"] == 30, report
+          assert report["condition_predictions_written"] == 60, report
+          assert report["mock_api_requests"] > 0, report
+          assert report["external_provider_calls"] == 0, report
+          assert report["model_predictions_generated"] is False, report
+          assert report["benchmark_accuracy_reported"] is False, report
+          assert not (root / "metrics.json").exists(), "Mock accuracy metrics must not be published."
+          assert (root / "predictions").is_dir()
+          assert (root / "traces").is_dir()
+          assert (root / "events.jsonl").is_file()
+          for path in (root / "predictions").glob("*/*.json"):
+              item = json.loads(path.read_text())
+              assert item["prediction_evidence"] == "SYNTHETIC_FIXTURE_NOT_MODEL_INFERENCE"
+          print("Mock pipeline passed: synthetic outputs clearly labeled; no model accuracy reported.")
+          PY
+      - name: Upload mock diagnostics and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrs-mock-pipeline-${{ github.run_id }}
+          path: results/public-benchmarks/mock-runs/ci-mock/
+          if-no-files-found: warn
+          retention-days: 30

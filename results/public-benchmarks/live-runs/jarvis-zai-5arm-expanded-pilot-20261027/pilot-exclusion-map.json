@@ -1,0 +1,20 @@
+{
+  "abercrombie": [
+    87
+  ],
+  "citation_prediction_classification": [
+    37
+  ],
+  "contract_qa": [
+    19
+  ],
+  "function_of_decision_section": [
+    323
+  ],
+  "legal_reasoning_causality": [
+    48
+  ],
+  "ucc_v_common_law": [
+    68
+  ]
+}

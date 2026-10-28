@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "run_id": "jarvis-zai-5arm-six-task-pilot-20261027",
+  "status": "COMPLETED_EXPLORATORY_PILOT_NOT_CONFIRMATORY",
+  "created_at_utc": "2026-10-27",
+  "branch": "experiments/scrs-seeded-semantic-pilot-2026-10-27",
+  "source_data": {
+    "dataset": "LegalBench",
+    "archive_sha256": "f2eed6bdf3bf08d5837c33c04634e1fbb32544ac1d0e1eeacd20e034ce0ade0a",
+    "upstream_revision": "daec8237410aa23e3faf4bc41ad8b3a7e1696826",
+    "split": "test",
+    "sample_seed": 20261027,
+    "sample_selection_strategy": "sha256_seeded_random_sample_v1; one row per task; individual task run IDs preserved",
+    "selected_test_row_indices": {
+      "abercrombie": [
+        87
+      ],
+      "citation_prediction_classification": [
+        37
+      ],
+      "contract_qa": [
+        19
+      ],
+      "function_of_decision_section": [
+        323
+      ],
+      "legal_reasoning_causality": [
+        48
+      ],
+      "ucc_v_common_law": [
+        68
+      ]
+    }
+  },
+  "provider": {
+    "base_url": "https://api.jarvisclaw.ai/v1",
+    "requested_model": "zai/glm-4-flash",
+    "observed_model_ids": [
+      "glm-4-flash"
+    ],
+    "api_key_used": false,
+    "min_interval_seconds": 5,
+    "timeout_seconds": 60,
+    "max_retries": 1,
+    "temperature": 0
+  },
+  "conditions": [
+    "baseline",
+    "capsule_only",
+    "capsule_graph_no_anchor",
+    "capsule_anchor_no_graph",
+    "compiled_graph_gates"
+  ],
+  "physical_usage_totals": {
+    "provider_transport_attempts": 48,
+    "confirmed_provider_generations": 48,
+    "provider_reported_input_tokens": 17996,
+    "provider_reported_output_tokens": 846
+  },
+  "cost": "NR; token usage is provider-reported but a billed-cost basis and invoice reconciliation were not configured.",
+  "experimental_unit_count": 6,
+  "sample_size_warning": "One row per distinct task is descriptive only. Do not pool task accuracies or interaction values as an inferential estimate. This pilot cannot support a publication claim."
+}
