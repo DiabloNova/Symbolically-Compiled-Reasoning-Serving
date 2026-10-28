@@ -87,6 +87,7 @@ class OpenAICompatibleClient:
         max_retries: int = 2,
         allow_unauthenticated: bool = False,
         max_token_parameter: str | None = None,
+        reasoning_mode: bool | None = None,
         extra_body: dict[str, Any] | None = None,
         min_interval_seconds: float = 0.0,
     ) -> None:
@@ -117,14 +118,18 @@ class OpenAICompatibleClient:
                 "max_token_parameter must be max_tokens or max_completion_tokens."
             )
         is_openai_api = parsed.hostname == "api.openai.com"
-        selected_token_parameter = max_token_parameter or (
-            "max_completion_tokens" if is_openai_api else "max_tokens"
-        )
-        # Current OpenAI reasoning-model families (o-series and GPT-5+) reject
-        # temperature and use developer-role instructions in place of system.
+        # Reasoning-model request semantics follow the configured model/provider
+        # contract, not only the hostname: OpenAI-compatible proxies can serve
+        # o-series and GPT-5 models too. Explicit per-role configuration wins.
         model_lower = model.casefold()
-        openai_reasoning_family = is_openai_api and (
-            model_lower.startswith(("o1", "o3", "o4", "gpt-5"))
+        inferred_reasoning_mode = model_lower.startswith(("o1", "o3", "o4", "gpt-5"))
+        if reasoning_mode is not None and not isinstance(reasoning_mode, bool):
+            raise ProviderConfigurationError("reasoning_mode must be true, false, or None.")
+        openai_reasoning_family = (
+            inferred_reasoning_mode if reasoning_mode is None else reasoning_mode
+        )
+        selected_token_parameter = max_token_parameter or (
+            "max_completion_tokens" if is_openai_api or openai_reasoning_family else "max_tokens"
         )
         self.base_url = base_url
         self.model = model
@@ -174,7 +179,23 @@ class OpenAICompatibleClient:
         timeout = float(os.getenv("SCRS_PROVIDER_TIMEOUT_SECONDS", "60"))
         retries = int(os.getenv("SCRS_PROVIDER_MAX_RETRIES", "2"))
         min_interval = float(os.getenv("SCRS_PROVIDER_MIN_INTERVAL_SECONDS", "0"))
-        token_parameter = os.getenv("SCRS_MAX_TOKEN_PARAMETER") or None
+        token_parameter = (
+            os.getenv(f"{prefix}_MAX_TOKEN_PARAMETER")
+            or os.getenv("SCRS_MAX_TOKEN_PARAMETER")
+            or None
+        )
+        raw_reasoning_mode = (
+            os.getenv(f"{prefix}_REASONING_MODE")
+            or os.getenv("SCRS_REASONING_MODE")
+            or ""
+        ).strip().lower()
+        if raw_reasoning_mode and raw_reasoning_mode not in {"true", "false"}:
+            raise ProviderConfigurationError(
+                f"{prefix}_REASONING_MODE / SCRS_REASONING_MODE must be 'true' or 'false'."
+            )
+        reasoning_mode = (
+            raw_reasoning_mode == "true" if raw_reasoning_mode else None
+        )
         raw_extra_body = os.getenv("SCRS_PROVIDER_EXTRA_BODY_JSON", "").strip()
         try:
             extra_body = json.loads(raw_extra_body) if raw_extra_body else {}
@@ -195,6 +216,7 @@ class OpenAICompatibleClient:
             max_retries=retries,
             allow_unauthenticated=allow_unauthenticated,
             max_token_parameter=token_parameter,
+            reasoning_mode=reasoning_mode,
             extra_body=extra_body,
             min_interval_seconds=min_interval,
         )
