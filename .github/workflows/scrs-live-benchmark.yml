@@ -113,7 +113,7 @@ jobs:
       - name: Require explicit provider configuration
         shell: bash
         run: |
-          if [[ -z "\${SCRS_MODEL}" || -z "\${SCRS_API_KEY}" ]]; then
+          if [[ -z "${SCRS_MODEL}" || -z "${SCRS_API_KEY}" ]]; then
             echo "Live inference requires SCRS_MODEL workflow input and SCRS_API_KEY repository secret."
             exit 2
           fi
@@ -126,7 +126,7 @@ jobs:
         run: |
           args=(--tasks "$INPUT_TASKS" --max-examples "$INPUT_MAX_EXAMPLES")
           if [[ "$INPUT_FULL" == "true" ]]; then args+=(--full); fi
-          python experiments/scrs_runtime/run_legalbench.py "\${args[@]}"
+          python experiments/scrs_runtime/run_legalbench.py "${args[@]}"
       - name: Upload live run records, metrics, and prediction files
         if: always()
         uses: actions/upload-artifact@v4
@@ -136,61 +136,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-
-  live-pilot-if-configured:
-    if: github.event_name == 'pull_request'
-    needs: offline-validation
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      SCRS_API_KEY: ${{ secrets.SCRS_API_KEY }}
-      SCRS_BASE_URL: ${{ vars.SCRS_BASE_URL }}
-      SCRS_MODEL: ${{ vars.SCRS_MODEL }}
-      SCRS_RENDER_MODEL: ${{ vars.SCRS_RENDER_MODEL }}
-      SCRS_RENDER_BASE_URL: ${{ vars.SCRS_RENDER_BASE_URL }}
-      SCRS_RENDER_API_KEY: ${{ secrets.SCRS_RENDER_API_KEY }}
-      SCRS_ORACLE_MODEL: ${{ vars.SCRS_ORACLE_MODEL }}
-      SCRS_ORACLE_BASE_URL: ${{ vars.SCRS_ORACLE_BASE_URL }}
-      SCRS_ORACLE_API_KEY: ${{ secrets.SCRS_ORACLE_API_KEY }}
-      SCRS_ANCHOR_MODEL: ${{ vars.SCRS_ANCHOR_MODEL }}
-      SCRS_ANCHOR_BASE_URL: ${{ vars.SCRS_ANCHOR_BASE_URL }}
-      SCRS_ANCHOR_API_KEY: ${{ secrets.SCRS_ANCHOR_API_KEY }}
-    steps:
-      - name: Check out pull request
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Check whether live inference is configured
-        id: provider-config
-        shell: bash
-        run: |
-          if [[ -n "$SCRS_API_KEY" && -n "$SCRS_MODEL" ]]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "A two-row-per-task live pilot is enabled for this PR."
-            echo "It will make real provider requests and may incur usage charges."
-            echo "enabled=true" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Live predictions were not run: configure SCRS_API_KEY secret and SCRS_MODEL repository variable."
-            echo "Live predictions not run: provider credentials/model are not configured." >> "$GITHUB_STEP_SUMMARY"
-          fi
-      - name: Execute paired live predictions (2 test rows per task)
-        if: steps.provider-config.outputs.enabled == 'true'
-        run: >-
-          python experiments/scrs_runtime/run_legalbench.py
-          --tasks all --max-examples 2
-          --output-root results/public-benchmarks/live-runs
-          --run-id "pr-${GITHUB_RUN_ID}"
-      - name: Upload live predictions and request-linked traces
-        if: always() && steps.provider-config.outputs.enabled == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: scrs-live-pilot-${{ github.run_id }}
-          path: results/public-benchmarks/live-runs/
-          if-no-files-found: warn
-          retention-days: 30
 
   mock-pipeline-smoke-test:
     if: github.event_name == 'pull_request'
