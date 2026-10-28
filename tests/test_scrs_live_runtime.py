@@ -211,6 +211,7 @@ class AnchorClientTests(unittest.TestCase):
         request_obj = urlopen_mock.call_args.args[0]
         sent = json.loads(request_obj.data.decode("utf-8"))
         self.assertIn("max_completion_tokens", sent)
+        self.assertEqual(sent["max_completion_tokens"], 16)
         self.assertNotIn("max_tokens", sent)
         self.assertNotIn("temperature", sent)
         self.assertEqual(sent["messages"][0]["role"], "developer")
@@ -275,6 +276,11 @@ class AnchorClientTests(unittest.TestCase):
         self.assertEqual(error.attempts[0]["provider_generation_unknown_reason"], "TIMEOUT_OUTCOME_UNKNOWN")
         self.assertEqual(len(error.events), 1)
         self.assertEqual(error.events[0]["event_type"], "anchor_transport_attempt")
+        self.assertEqual(error.events[0]["provider_generation_evidence"], "UNKNOWN")
+        self.assertEqual(
+            error.events[0]["provider_generation_unknown_reason"],
+            "TIMEOUT_OUTCOME_UNKNOWN",
+        )
         sleep_mock.assert_not_called()
 
     @patch("experiments.scrs_runtime.anchor_client.time.sleep")
