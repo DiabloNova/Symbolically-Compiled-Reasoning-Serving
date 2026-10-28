@@ -87,7 +87,9 @@ jobs:
           --run-id "ci-validation"
 
   live-predictions:
-    if: github.event_name == 'workflow_dispatch'
+    # Never execute a selectable PR branch while provider secrets are present.
+    # Live inference is restricted to explicit dispatches from trusted main.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
